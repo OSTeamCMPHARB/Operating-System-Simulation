@@ -7,11 +7,13 @@ struct process
 {
     int id;
     int arrival;
-    int  runtime;
+    int runtime;
     int priority;
     int pid;
     int remain;
     int wait;
+    int timeToRun;
+    int forked;
 };
 
 struct node

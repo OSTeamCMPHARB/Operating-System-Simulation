@@ -69,12 +69,12 @@ void destroyClk(bool terminateAll)
 }
 struct msgbuff
 {
-    long mtype;
-    struct process sp;
+    int allProcessesGenerated;// 1 means not finished yet | 2 means finished generating
+    struct process processObj;
 };
 
 struct pbuff
 {
     long mtype;
-    int r;
+    int remainingTime;
 };
