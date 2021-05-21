@@ -33,12 +33,12 @@ int main(int argc, char *argv[])
     // note change the file path with your path
     pid[0] = fork();
     if (pid[0] == 0)
-        execl("/home/robert/Desktop/projects/test/OS_Scheduler/clk.out", "clk.out", NULL);
+        execl("/home/hazem/Desktop/OS_Scheduler-main/clk.out", "clk.out", NULL);
 
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
-        execl("//home/robert/Desktop/projects/test/OS_Scheduler/scheduler.out", "scheduler.out", argv[1],NULL);
+        execl("/home/hazem/Desktop/OS_Scheduler-main/scheduler.out", "scheduler.out", argv[1],NULL);
 
 
     initClk();//Initializing the clock at the start of process generation

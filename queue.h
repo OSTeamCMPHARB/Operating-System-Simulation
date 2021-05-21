@@ -12,8 +12,9 @@ struct process
     int pid;
     int remain;
     int wait;
-    int timeToRun;
     int forked;
+    int finishTime;
+    int startTime;
 };
 
 struct node

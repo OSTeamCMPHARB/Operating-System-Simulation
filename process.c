@@ -18,7 +18,7 @@ int main(int agrc, char *argv[])
     val = msgrcv(msgq_id_SP, &message, sizeof(message.remainingTime), type, !IPC_NOWAIT);
     remainingtime = message.remainingTime;
 
-    printf ("remining time %d\n",remainingtime);
+    //printf ("remining time %d\n",remainingtime);
     //TODO The process needs to get the remaining time from somewhere
     //remainingtime = ??;
     while (remainingtime > 0)
@@ -31,7 +31,7 @@ int main(int agrc, char *argv[])
         }
 
     }
-    printf ("terminated at %d\n",getClk());
+    printf ("process terminated at %d\n",getClk());
 
     destroyClk(false);
 
