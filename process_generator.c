@@ -33,12 +33,12 @@ int main(int argc, char *argv[])
     // note change the file path with your path
     pid[0] = fork();
     if (pid[0] == 0)
-        execl("/home/hazem/Desktop/OS_Scheduler-main/clk.out", "clk.out", NULL);
+        execl("/home/robert/Desktop/projects/test/OS_Scheduler/clk.out", "clk.out", NULL);
 
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
-        execl("/home/hazem/Desktop/OS_Scheduler-main/scheduler.out", "scheduler.out", argv[1],NULL);
+        execl("//home/robert/Desktop/projects/test/OS_Scheduler/scheduler.out", "scheduler.out", argv[1],NULL);
 
 
     initClk();//Initializing the clock at the start of process generation
@@ -63,17 +63,9 @@ int main(int argc, char *argv[])
         // if there is a process arrived at that time, send it to the scheduler
         if (processesQueue.front->data.arrival <= currTime)
         {
+            message.processObj = dequeue(&processesQueue);
             val = msgsnd(msgq_id_SPG, &message, sizeof(message.processObj), !IPC_NOWAIT);
-            /*if more than one process arrived at same time*/
-            while(processesQueue.front->data.arrival<=currTime){
-                message.processObj = dequeue(&processesQueue);
-                val = msgsnd(msgq_id_SPG, &message, sizeof(message.processObj), !IPC_NOWAIT);
-
-                if (val == -1){
-                    perror("Errror in send");
-                }
-            }
-
+         
             if (val == -1){
                 perror("Errror in send");
             }
