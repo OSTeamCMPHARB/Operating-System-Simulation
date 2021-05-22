@@ -225,7 +225,10 @@ int main(int argc, char *argv[])
         msgbuff message;
         pbuff processMessage;
         queue readyQueue; //queue for ready processes
+        queue finishedQueue;//queue for finished processes
         initialize(&readyQueue);
+        initialize(&finishedQueue);
+
         int flag = 1; //inticades that the schedular is not busy
 
         process *processRunning = NULL;
@@ -235,7 +238,7 @@ int main(int argc, char *argv[])
         int printClk=-1;
         int TA = 0;
         float WTA = 0;
-        while (flag || !isempty(&readyQueue))
+        while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue))
         {
             int Clk=getClk();
             if(printClk!=getClk()){
@@ -253,6 +256,8 @@ int main(int argc, char *argv[])
                 else
                 {
                     message.processObj.runtime=0;//Didn't run before so intialize it to zero
+                    message.processObj.forked=0;//Wasn't forked before
+                    message.processObj.real=1;//Wasn't forked before
                     enqueue(&readyQueue, message.processObj);
                     NumberOfProcesses++;
                     while(message.moreProcess){
@@ -268,55 +273,73 @@ int main(int argc, char *argv[])
                     
                 }
             }
-            if (readyQueue.count > 0 && currTime!=Clk){//if it's a new time step run process with the currTurn
+            if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime!=Clk ){//if it's a new time step run process with the currTurn
                 currTime=Clk;
-                currProcess = dequeue(&readyQueue);
-                /* To avoid multiple forking for the same process */
-                if (!currProcess.forked)
-                {
-                    currProcess.pid = fork();
-                    currProcess.forked = 1;
-                    currProcess.startTime=Clk;
-                    /*if this is the child process make it execute the currProcess*/
-                    if (currProcess.pid == 0)
-                    {
-                        
-                        execl("/home/hazem/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
-                    }
-                }
-                printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n",currProcess.pid,currProcess.forked,currProcess.arrival,currProcess.remain,currProcess.runtime);
-                printf("Will compare getCLk %d with currTIme %d\n",Clk,currTime);
-
-                /*send the remaining time to the process.c to decrement it*/
-                processMessage.mtype = currProcess.pid % 100000;
-                processMessage.remainingTime = currProcess.remain;
-                currProcess.remain = (currProcess.remain) - 1; //Decremting Remaining Time
-                currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Remaining Time
-                
-                val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
-                if(val==-1){
-                    perror("Error while schedular send to process");
-                }
 
                 
-
-                if(currProcess.remain>0){
-                    /*Details Of Process In That time step*/
-                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-                    /*enqueuing the process again to the queue to take it's turn*/
-                    enqueue(&readyQueue, currProcess);
-                }else{
+                if(!isempty(&finishedQueue)){//If process is finished
+                    currProcess=dequeue(&finishedQueue);
+                    currProcess.real=0;
                     currProcess.finishTime=Clk;
-                    currProcess.wait=currProcess.finishTime-currProcess.startTime-currProcess.runtime+1;
-                    TA = currProcess.wait + currProcess.runtime;
-                    WTA = (float)TA / currProcess.runtime;
+                    currProcess.wait=currProcess.finishTime-currProcess.startTime-currProcess.runtime;
+                    TA = currProcess.wait + currProcess.runtime;//total turn around , waiting + running
+                    WTA = (float)TA / currProcess.runtime;//total turn around over runtime
                     TotalWait += currProcess.wait;
                     TotalWTA += WTA;
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
-                } 
+                }
+
+                if(!isempty(&readyQueue)){
+                    currProcess = dequeue(&readyQueue);//sending signal continue to process
+                    if(currProcess.forked){
+                        kill(SIGCONT,currProcess.pid);
+                    }
+                
+                    /* To avoid multiple forking for the same process */
+                    if (!currProcess.forked)
+                    {
+                        currProcess.pid = fork();
+                        currProcess.forked = 1;
+                        currProcess.startTime=Clk;
+                        /*if this is the child process make it execute the currProcess*/
+                        if (currProcess.pid == 0)
+                        {
+                            execl("/home/hazem/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
+                        }
+                    }
+                    printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n",currProcess.pid,currProcess.forked,currProcess.arrival,currProcess.remain,currProcess.runtime);
+                    printf("Will compare getCLk %d with currTIme %d\n",Clk,currTime);
+
+                    if(currProcess.remain>0){
+                        /*send the remaining time to the process.c to decrement it*/
+                        processMessage.mtype = currProcess.pid % 100000;
+                        processMessage.remainingTime = currProcess.remain;
+                        currProcess.remain = (currProcess.remain) - 1; //Decremting Remaining Time Then will send STOP signal
+                        currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Remaining Time
+                        val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
+
+                        if(val==-1){
+                            perror("Error while schedular send to process");
+                        }
+
+                        /*Details Of Process In That time step*/
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+
+                        kill(SIGSTOP,currProcess.pid);//sending to process to stop
+                        /*enqueuing the process again to the queue to take it's turn*/
+                        if(currProcess.remain>0){
+                            enqueue(&readyQueue, currProcess);
+                        }else{
+                            enqueue(&finishedQueue,currProcess);
+                        }
+                    }
+                }
+                
+                
             }
         }
     }
+    
     float CPU_utilization = ((float)usefulTime / (getClk()-1)) * 100;
     fprintf(perfFile, " CPU utilization = %.2f\n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
     fclose(perfFile);

@@ -15,6 +15,7 @@ struct process
     int forked;
     int finishTime;
     int startTime;
+    int real;
 };
 
 struct node
