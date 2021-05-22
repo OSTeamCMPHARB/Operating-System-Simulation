@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include "queue.h"
+#include "priorityqueue.h"
+#include "string.h"
 
 typedef short bool;
 typedef struct msgbuff msgbuff;
@@ -71,6 +73,7 @@ struct msgbuff
 {
     int allProcessesGenerated;// 1 means not finished yet | 2 means finished generating
     struct process processObj;
+    int moreProcess;
 };
 
 struct pbuff

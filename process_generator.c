@@ -56,6 +56,8 @@ int main(int argc, char *argv[])
     msgbuff message;
     // type 1 means that there is a process arrived in the system 
     message.allProcessesGenerated = 1;
+    queue currProcesses;
+    initialize(&currProcesses);
     int val;
     while (!isempty(&processesQueue))
     {
@@ -63,12 +65,24 @@ int main(int argc, char *argv[])
         // if there is a process arrived at that time, send it to the scheduler
         if (processesQueue.front->data.arrival <= currTime)
         {
-            message.processObj = dequeue(&processesQueue);
-            val = msgsnd(msgq_id_SPG, &message, sizeof(message.processObj), !IPC_NOWAIT);
-         
-            if (val == -1){
-                perror("Errror in send");
+            while(!isempty(&processesQueue) && processesQueue.front->data.arrival <= currTime ){
+                enqueue(&currProcesses,dequeue(&processesQueue));
             }
+            while (!isempty(&currProcesses))
+            {
+                message.processObj=dequeue(&currProcesses);
+                if(currProcesses.count>0){
+                    message.moreProcess=1;
+                }else{
+                    message.moreProcess=0;
+                }
+
+                val = msgsnd(msgq_id_SPG, &message, sizeof(message.processObj), !IPC_NOWAIT);
+                if (val == -1){
+                    perror("Errror in send");
+                }
+            }
+            
         }
     }
     /*Sending 2 to schedular to say no more processes is arriving, which will lead to make it's flag = 0 */
