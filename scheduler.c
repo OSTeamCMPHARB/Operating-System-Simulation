@@ -64,12 +64,14 @@ int main(int argc, char *argv[])
                 {
                     enqueue(&readyQueue, message.processObj);
                     NumberOfProcesses++;
-                    while(message.moreProcess){
+                    while (message.moreProcess)
+                    {
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         enqueue(&readyQueue, message.processObj);
                         NumberOfProcesses++;
                     }
-                    if(message.allProcessesGenerated == 2){
+                    if (message.allProcessesGenerated == 2)
+                    {
                         flag = 0;
                     }
                 }
@@ -125,7 +127,6 @@ int main(int argc, char *argv[])
                         processRunning = NULL;
                     }
                 }
-                
             }
             // while time dosent change dont do any any thing (busy wait)
             //  while (currTime == getClk()){}
@@ -163,12 +164,14 @@ int main(int argc, char *argv[])
                 {
                     enqueuepriority(&readyQueue, message.processObj, message.processObj.runtime);
                     NumberOfProcesses++;
-                    while(message.moreProcess){
+                    while (message.moreProcess)
+                    {
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         enqueuepriority(&readyQueue, message.processObj, message.processObj.runtime);
                         NumberOfProcesses++;
                     }
-                    if(message.allProcessesGenerated == 2){
+                    if (message.allProcessesGenerated == 2)
+                    {
                         flag = 0;
                     }
                 }
@@ -224,7 +227,6 @@ int main(int argc, char *argv[])
                         processRunning = NULL;
                     }
                 }
-                
             }
             // while time dosent change dont do any any thing (busy wait)
             //  while (currTime == getClk()){}
@@ -232,6 +234,136 @@ int main(int argc, char *argv[])
     }
     else if (selectAlgo == 3)
     { //HPF Highest Priority First
+        msgbuff message;
+        pbuff pmessage;
+        priorityqueue readyQueue;
+        initializepriority(&readyQueue);
+        int flag = 1;
+        int TA = 0;
+        float WTA = 0;
+        process *processRunning = NULL;
+        process currProcess;
+        int finishTime = 0;
+        currTime = 1;
+        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime))
+        {
+            val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
+            if (val != -1)
+            {
+                if (message.allProcessesGenerated == 2)
+                {
+                    flag = 0;
+                }
+                else
+                {
+                    enqueuepriority(&readyQueue, message.processObj, message.processObj.priority); //changed
+                    NumberOfProcesses++;
+                    while (message.moreProcess)
+                    {
+                        val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
+                        enqueuepriority(&readyQueue, message.processObj, message.processObj.priority); //changed
+                        NumberOfProcesses++;
+                    }
+                    if (message.allProcessesGenerated == 2)
+                    {
+                        flag = 0;
+                    }
+                }
+            }
+
+            ///////////////////////////////////////////////////start trial
+            if (!isemptypriority(&readyQueue))
+            {
+                if (processRunning == NULL)
+                {
+                    currProcess = dequeuepriority(&readyQueue);
+                    processRunning = &currProcess;
+                    if (processRunning->isblocked == 1)
+                    {
+                        kill(processRunning->pid, SIGCONT);
+                        finishTime = getClk() + processRunning->remain;
+                        printf("process with PID = %d resumed at time step = %d  the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                    }
+                    else
+                    {
+                        processRunning->pid = fork();
+                        if (processRunning->pid == 0)
+                        {
+                            execl("/home/ghraboly/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
+                        }
+                        processRunning->wait = getClk() - processRunning->arrival;
+                        finishTime = getClk() + processRunning->remain;
+                        printf(" id :%d  start at :%d  end at %d:\n", processRunning->id, getClk(), finishTime);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                    }
+                    pmessage.mtype = processRunning->pid % 100000;
+                    pmessage.remainingTime = processRunning->remain;
+                    val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
+                }
+
+                else
+                {
+                    if (processRunning->priority > beek(&readyQueue)->priority) //change
+                    {
+                        kill(processRunning->pid, SIGSTOP);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                        processRunning->isblocked = 1;
+                        enqueuepriority(&readyQueue, currProcess, message.processObj.priority); //change
+                        currProcess = dequeuepriority(&readyQueue);
+                        processRunning = &currProcess;
+                        if (processRunning->isblocked == 1)
+                        {
+                            kill(processRunning->pid, SIGCONT);
+                            finishTime = currTime + processRunning->remain;
+                            printf("process with PID = %d continue at time step = %d the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
+                            fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                        }
+                        else
+                        {
+                            processRunning->pid = fork();
+                            if (processRunning->pid == 0)
+                            {
+                                execl("/home/ghraboly/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
+                            }
+                            processRunning->wait = getClk() - processRunning->arrival;
+                            finishTime = getClk() + processRunning->remain;
+                            printf(" id :%d  start at :%d  end at %d:\n", processRunning->id, getClk(), finishTime);
+                            fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                        }
+                        pmessage.mtype = processRunning->pid % 100000;
+                        pmessage.remainingTime = processRunning->remain;
+                        val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
+                    }
+                }
+            }
+            if (currTime != getClk())
+            {
+                currTime = getClk();
+                printf("%d\n", currTime);
+                usefulTime++;
+                if (processRunning != NULL)
+                {
+                    // if there is process running decreamt remaing time then send it to this process
+                    processRunning->remain--;
+                    pmessage.mtype = processRunning->pid % 100000;
+                    pmessage.remainingTime = processRunning->remain;
+                    val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
+                    if (processRunning->remain == 0)
+                    {
+                        // if the remaining time =0 set the run pointer to null to take anther process
+                        printf(" run time %d \n", processRunning->remain);
+                        TA = processRunning->wait + processRunning->runtime;
+                        WTA = (float)TA / processRunning->runtime;
+                        TotalWait += processRunning->wait;
+                        TotalWTA += WTA;
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait, TA, WTA);
+                        processRunning = NULL;
+                    }
+                }
+            }
+            //////////////////////////////////////////////////end trial
+        }
     }
     else if (selectAlgo == 4)
     { //SRTN Shortest Remaining Time Next
@@ -246,7 +378,8 @@ int main(int argc, char *argv[])
         process currProcess;
         int finishTime = 0;
         currTime = 1;
-        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime)){
+        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime))
+        {
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
             {
@@ -258,23 +391,26 @@ int main(int argc, char *argv[])
                 {
                     enqueuepriority(&readyQueue, message.processObj, message.processObj.runtime);
                     NumberOfProcesses++;
-                    while(message.moreProcess){
+                    while (message.moreProcess)
+                    {
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         enqueuepriority(&readyQueue, message.processObj, message.processObj.runtime);
                         NumberOfProcesses++;
                     }
-                    if(message.allProcessesGenerated == 2){
+                    if (message.allProcessesGenerated == 2)
+                    {
                         flag = 0;
                     }
                 }
             }
             ///////////////////////////////////////////////////start trial
-            if(!isemptypriority(&readyQueue)){
-                if(processRunning == NULL)
+            if (!isemptypriority(&readyQueue))
+            {
+                if (processRunning == NULL)
                 {
                     currProcess = dequeuepriority(&readyQueue);
                     processRunning = &currProcess;
-                    if(processRunning->isblocked == 1)
+                    if (processRunning->isblocked == 1)
                     {
                         kill(processRunning->pid, SIGCONT);
                         finishTime = getClk() + processRunning->remain;
@@ -299,14 +435,15 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    if(processRunning->remain > beek(&readyQueue)->remain){
+                    if (processRunning->remain > beek(&readyQueue)->remain) //change
+                    {
                         kill(processRunning->pid, SIGSTOP);
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
-                        enqueuepriority(&readyQueue, currProcess, message.processObj.runtime);
+                        enqueuepriority(&readyQueue, currProcess, message.processObj.runtime); //change
                         currProcess = dequeuepriority(&readyQueue);
                         processRunning = &currProcess;
-                        if(processRunning->isblocked == 1)
+                        if (processRunning->isblocked == 1)
                         {
                             kill(processRunning->pid, SIGCONT);
                             finishTime = currTime + processRunning->remain;
@@ -316,27 +453,28 @@ int main(int argc, char *argv[])
                         else
                         {
                             processRunning->pid = fork();
-                            if(processRunning->pid == 0){
+                            if (processRunning->pid == 0)
+                            {
                                 execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
                             }
                             processRunning->wait = getClk() - processRunning->arrival;
                             finishTime = getClk() + processRunning->remain;
                             printf(" id :%d  start at :%d  end at %d:\n", processRunning->id, getClk(), finishTime);
                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
-                        } 
+                        }
                         pmessage.mtype = processRunning->pid % 100000;
                         pmessage.remainingTime = processRunning->remain;
                         val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                     }
                 }
             }
-            if(currTime != getClk())
+            if (currTime != getClk())
             {
                 currTime = getClk();
                 printf("%d\n", currTime);
                 usefulTime++;
                 if (processRunning != NULL)
-                {   
+                {
                     // if there is process running decreamt remaing time then send it to this process
                     processRunning->remain--;
                     pmessage.mtype = processRunning->pid % 100000;
@@ -353,7 +491,7 @@ int main(int argc, char *argv[])
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait, TA, WTA);
                         processRunning = NULL;
                     }
-                }   
+                }
             }
             //////////////////////////////////////////////////end trial
         }
@@ -362,8 +500,8 @@ int main(int argc, char *argv[])
     { //RR Round Robin
         msgbuff message;
         pbuff processMessage;
-        queue readyQueue; //queue for ready processes
-        queue finishedQueue;//queue for finished processes
+        queue readyQueue;    //queue for ready processes
+        queue finishedQueue; //queue for finished processes
         initialize(&readyQueue);
         initialize(&finishedQueue);
 
@@ -373,15 +511,16 @@ int main(int argc, char *argv[])
         process currProcess;
         int finishTime = 0;
         currTime = -1;
-        int printClk=-1;
+        int printClk = -1;
         int TA = 0;
         float WTA = 0;
         while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue))
         {
-            int Clk=getClk();
-            if(printClk!=getClk()){
-                printClk=getClk();
-                printf("Current Time %d\n",getClk());
+            int Clk = getClk();
+            if (printClk != getClk())
+            {
+                printClk = getClk();
+                printf("Current Time %d\n", getClk());
             }
             /*if there is a message from process_generator insert the arrived process in the queue*/
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
@@ -393,14 +532,15 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    message.processObj.runtime=0;//Didn't run before so intialize it to zero
-                    message.processObj.forked=0;//Wasn't forked before
-                    message.processObj.real=1;//Wasn't forked before
+                    message.processObj.runtime = 0; //Didn't run before so intialize it to zero
+                    message.processObj.forked = 0;  //Wasn't forked before
+                    message.processObj.real = 1;    //Wasn't forked before
                     enqueue(&readyQueue, message.processObj);
                     NumberOfProcesses++;
-                    while(message.moreProcess){
+                    while (message.moreProcess)
+                    {
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
-                        message.processObj.runtime=0;//Didn't run before so intialize it to zero
+                        message.processObj.runtime = 0; //Didn't run before so intialize it to zero
                         enqueue(&readyQueue, message.processObj);
                         NumberOfProcesses++;
                     }
@@ -408,77 +548,82 @@ int main(int argc, char *argv[])
                     {
                         flag = 0;
                     }
-                    
                 }
             }
-            if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime!=Clk ){//if it's a new time step run process with the currTurn
-                currTime=Clk;
+            if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
+            { //if it's a new time step run process with the currTurn
+                currTime = Clk;
 
-                
-                if(!isempty(&finishedQueue)){//If process is finished
-                    currProcess=dequeue(&finishedQueue);
-                    currProcess.real=0;
-                    currProcess.finishTime=Clk;
-                    currProcess.wait=currProcess.finishTime-currProcess.startTime-currProcess.runtime;
-                    TA = currProcess.wait + currProcess.runtime;//total turn around , waiting + running
-                    WTA = (float)TA / currProcess.runtime;//total turn around over runtime
+                if (!isempty(&finishedQueue))
+                { //If process is finished
+                    currProcess = dequeue(&finishedQueue);
+                    currProcess.real = 0;
+                    currProcess.finishTime = Clk;
+                    currProcess.wait = currProcess.finishTime - currProcess.startTime - currProcess.runtime;
+                    TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
+                    WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                     TotalWait += currProcess.wait;
                     TotalWTA += WTA;
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
                 }
 
-                if(!isempty(&readyQueue)){
-                    currProcess = dequeue(&readyQueue);//sending signal continue to process
-                    if(currProcess.forked){
-                        kill(SIGCONT,currProcess.pid);
+                if (!isempty(&readyQueue))
+                {
+                    currProcess = dequeue(&readyQueue); //sending signal continue to process
+                    if (currProcess.forked)
+                    {
+                        kill(SIGCONT, currProcess.pid);
                     }
-                
+
                     /* To avoid multiple forking for the same process */
                     if (!currProcess.forked)
                     {
                         currProcess.pid = fork();
                         currProcess.forked = 1;
-                        currProcess.startTime=Clk;
+                        currProcess.startTime = Clk;
                         /*if this is the child process make it execute the currProcess*/
                         if (currProcess.pid == 0)
                         {
                             execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
                         }
                     }
-                    printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n",currProcess.pid,currProcess.forked,currProcess.arrival,currProcess.remain,currProcess.runtime);
-                    printf("Will compare getCLk %d with currTIme %d\n",Clk,currTime);
+                    printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.pid, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                    printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
-                    if(currProcess.remain>0){
+                    if (currProcess.remain > 0)
+                    {
                         /*send the remaining time to the process.c to decrement it*/
                         processMessage.mtype = currProcess.pid % 100000;
                         processMessage.remainingTime = currProcess.remain;
-                        currProcess.remain = (currProcess.remain) - 1; //Decremting Remaining Time Then will send STOP signal
+                        currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
                         currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Remaining Time
                         val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
 
-                        if(val==-1){
+                        if (val == -1)
+                        {
                             perror("Error while schedular send to process");
                         }
 
                         /*Details Of Process In That time step*/
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
 
-                        kill(SIGSTOP,currProcess.pid);//sending to process to stop
+                        kill(SIGSTOP, currProcess.pid); //sending to process to stop
                         /*enqueuing the process again to the queue to take it's turn*/
-                        if(currProcess.remain>0){
+                        if (currProcess.remain > 0)
+                        {
                             enqueue(&readyQueue, currProcess);
-                        }else{
-                            enqueue(&finishedQueue,currProcess);
+                        }
+                        else
+                        {
+                            enqueue(&finishedQueue, currProcess);
                         }
                     }
                 }
-                
-                
             }
         }
     }
-    
-    float CPU_utilization = ((float)usefulTime / (getClk()-1)) * 100;
+
+    float CPU_utilization = ((float)usefulTime / (getClk() - 1)) * 100;
     fprintf(perfFile, " CPU utilization = %.2f\n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
     fclose(perfFile);
     fclose(pFile);
