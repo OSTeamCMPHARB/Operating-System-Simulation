@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
         procObj.remain=procObj.runtime;
         procObj.forked=0;
         procObj.wait=0;
+        procObj.isblocked = 0;
         enqueue(&processesQueue, procObj);
     }
     
@@ -33,12 +34,12 @@ int main(int argc, char *argv[])
     // note change the file path with your path
     pid[0] = fork();
     if (pid[0] == 0)
-        execl("/home/hazem/Desktop/OS_Scheduler-main/clk.out", "clk.out", NULL);
+        execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/clk.out", "clk.out", NULL);
 
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
-        execl("/home/hazem/Desktop/OS_Scheduler-main/scheduler.out", "scheduler.out", argv[1],NULL);
+        execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/scheduler.out", "scheduler.out", argv[1],NULL);
 
 
     initClk();//Initializing the clock at the start of process generation

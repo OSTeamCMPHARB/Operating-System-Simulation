@@ -16,6 +16,7 @@ struct process
     int finishTime;
     int startTime;
     int real;
+    int isblocked;
 };
 
 struct node

@@ -29,12 +29,12 @@ int isemptypriority(priorityqueue *q)
 {
     return (q->rear == NULL);
 }
-void enqueuepriority(priorityqueue *q, process value)
+void enqueuepriority(priorityqueue *q, process value, int priority)
 {
     nodepriority *tmp;
     tmp =(nodepriority *)malloc((sizeof(nodepriority)));
     tmp->data = value;
-    tmp->priority = value.runtime;
+    tmp->priority = priority;
     tmp->next = NULL;
     if(!isemptypriority(q))
     {
@@ -78,4 +78,9 @@ process dequeuepriority(priorityqueue *q)
         q->rear=NULL;
     free(tmp);
     return(n);
+}
+
+process* beek(priorityqueue *q)
+{
+    return &(q->front->data);
 }
