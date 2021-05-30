@@ -7,22 +7,34 @@ int main(int argc, char *argv[])
     int msgq_id_SPG = msgget(Q1KEY, 0666 | IPC_CREAT);
     if (msgq_id_SPG == -1)
     {
-        perror("Error in create");
+        perror("Error in create SPG");
         exit(-1);
     }
     //create message queue to communicate schduler.c with process.c
     int msgq_id_SP = msgget(Q2KEY, 0666 | IPC_CREAT);
     if (msgq_id_SP == -1)
     {
-        perror("Error in create");
+        perror("Error in create SP");
+        exit(-1);
+    }
+    //create message queue to communicate scheduler.c with memory.c
+    int msgq_id_SM = msgget(Q3KEY, 0666 | IPC_CREAT);
+    if (msgq_id_SM == -1)
+    {
+        perror("Error in create SM");
         exit(-1);
     }
     int val;
     int currTime = getClk();
     int selectAlgo = atoi(argv[1]);
+    //writing output in scheduler.log
     FILE *pFile;
     pFile = fopen("Scheduler.log", "w");
     fprintf(pFile, "#At\ttime\tx\tprocess\ty\tstate\t\tarr\tw\ttotal\tz\tremain\ty\twait\tk \n");
+    //writing output in memory.log
+    FILE *mFile;
+    mFile = fopen("memory.log", "w");
+    fprintf(mFile, "#At\ttime\tx\tallocated\ty\tbytes\t\tfor process\tz\tfrom\ti\tto\tj \n");
 
     // for CPU utilization and Average WTA & Waiting time//
     FILE *perfFile;
@@ -497,11 +509,12 @@ int main(int argc, char *argv[])
         }
     }
     else if (selectAlgo == 5)
-    { //RR Round Robin
+    { //RR Round Robin Algorithm
         msgbuff message;
         pbuff processMessage;
         queue readyQueue;    //queue for ready processes
         queue finishedQueue; //queue for finished processes
+        struct mbuff memoRequest;
         initialize(&readyQueue);
         initialize(&finishedQueue);
 
@@ -570,7 +583,7 @@ int main(int argc, char *argv[])
                 if (!isempty(&readyQueue))
                 {
                     currProcess = dequeue(&readyQueue); //sending signal continue to process
-                    if (currProcess.forked)
+                    if (currProcess.forked)//if forked before & was stopped continue it
                     {
                         kill(SIGCONT, currProcess.pid);
                     }
@@ -578,14 +591,32 @@ int main(int argc, char *argv[])
                     /* To avoid multiple forking for the same process */
                     if (!currProcess.forked)
                     {
-                        currProcess.pid = fork();
-                        currProcess.forked = 1;
-                        currProcess.startTime = Clk;
-                        /*if this is the child process make it execute the currProcess*/
-                        if (currProcess.pid == 0)
-                        {
-                            execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                        /*First time for process to fork so check here if there is enough memory for the process*/
+                        memoRequest.finished=0;
+                        memoRequest.algorithmNum=1;
+                        memoRequest.memorySize=currProcess.remain;
+                        val=msgsnd(msgq_id_SM,&memoRequest,sizeof(memoRequest),!IPC_NOWAIT);//sending request to allocate the process
+                        if(val==-1){
+                            printf("error while sending memo request");
                         }
+                        val = msgrcv(msgq_id_SM, &memoRequest, sizeof(memoRequest), 0, !IPC_NOWAIT);//recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        if(val==-1){
+                            printf("error while recv memo request");
+                        }
+                        if(memoRequest.finished==1){//means there is available memo so fork the process
+                            currProcess.pid = fork();
+                            currProcess.forked = 1;
+                            currProcess.startTime = Clk;
+                            /*if this is the child process make it execute the currProcess*/
+                            if (currProcess.pid == 0)
+                            {
+                                execl("/home/hazem/Desktop/OS_Scheduler-main1/process.out", "process.out", NULL);
+                            }
+                        }else{//means there is no avaiable memory
+                            //----EDIT LATER add the waiting for memo space 
+                            enqueue(&readyQueue,currProcess); //sending signal continue to process
+                        }
+                        
                     }
                     printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.pid, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
                     printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
@@ -627,6 +658,7 @@ int main(int argc, char *argv[])
     fprintf(perfFile, " CPU utilization = %.2f\n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
     fclose(perfFile);
     fclose(pFile);
+    fclose(mFile);
 
     msgctl(msgq_id_SP, IPC_RMID, (struct msqid_ds *)0);
 

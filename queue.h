@@ -6,6 +6,8 @@ typedef struct queue queue;
 struct process
 {
     int id;
+    int memsize;
+    int memoryWait;
     int arrival;
     int runtime;
     int priority;

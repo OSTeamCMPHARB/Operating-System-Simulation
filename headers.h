@@ -25,6 +25,7 @@ typedef struct pbuff pbuff;
 #define SHKEY 300
 #define Q1KEY 111
 #define Q2KEY 222
+#define Q3KEY 333
 
 ///==============================
 //don't mess with this variable//
@@ -80,4 +81,13 @@ struct pbuff
 {
     long mtype;
     int remainingTime;
+};
+
+struct mbuff
+{
+    long algorithmNum;
+    int memorySize;
+    int start;
+    int finished;/* 0= program isn't finished         1= program finished          2= deallocate this memory    from scheduler to memory
+                    0= NO enough space were found           1= YES enough memory were found                     from memory to scheduler  */
 };

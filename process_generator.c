@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
     initialize(&processesQueue);
     char buff[255];
     fgets(buff, 255, fp);
-    int pid[2];
+    int pid[3];
     while (fscanf(fp, "%s", buff) != EOF){
         process procObj;
         procObj.id = atoi(buff);
@@ -23,6 +23,8 @@ int main(int argc, char *argv[])
         procObj.runtime = atoi(buff);
         fscanf(fp, "%s", buff);
         procObj.priority = atoi(buff);
+        fscanf(fp, "%s", buff);
+        procObj.memsize = atoi(buff);
         procObj.remain=procObj.runtime;
         procObj.forked=0;
         procObj.wait=0;
@@ -34,13 +36,16 @@ int main(int argc, char *argv[])
     // note change the file path with your path
     pid[0] = fork();
     if (pid[0] == 0)
-        execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/clk.out", "clk.out", NULL);
+        execl("/home/hazem/Desktop/OS_Scheduler-main1/clk.out", "clk.out", NULL);
 
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
-        execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/scheduler.out", "scheduler.out", argv[1],NULL);
+        execl("/home/hazem/Desktop/OS_Scheduler-main1/scheduler.out", "scheduler.out", argv[1],NULL);
 
+    pid[2] = fork();
+    if (pid[2] == 0)
+        execl("/home/hazem/Desktop/OS_Scheduler-main1/memory.out", "memory.out", NULL);   
 
     initClk();//Initializing the clock at the start of process generation
 
