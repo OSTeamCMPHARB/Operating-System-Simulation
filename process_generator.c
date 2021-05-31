@@ -7,6 +7,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, clearResources);
 
     /*Reading of the processes from the file*/
+    ///scheduler.o testcase.txt -sch 5 -q 2 -mem 3
     FILE *fp;
     fp = fopen("processes.txt", "r");
     queue processesQueue;
@@ -38,16 +39,22 @@ int main(int argc, char *argv[])
     if (pid[0] == 0)
         execl("/home/hazem/Desktop/OS_Scheduler-main1/clk.out", "clk.out", NULL);
 
+    pid[2] = fork();
+    if (pid[2] == 0){
+        printf("\n i entered \n");
+        execl("/home/hazem/Desktop/OS_Scheduler-main1/memory.out", "memory.out",argv[2], NULL); 
+    }
+          
+
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
         execl("/home/hazem/Desktop/OS_Scheduler-main1/scheduler.out", "scheduler.out", argv[1],NULL);
 
-    pid[2] = fork();
-    if (pid[2] == 0)
-        execl("/home/hazem/Desktop/OS_Scheduler-main1/memory.out", "memory.out", NULL);   
 
+    printf("Clock not Initialized \n");
     initClk();//Initializing the clock at the start of process generation
+    printf("Clock Initialized \n");
 
     int currTime = getClk();//saving the current clock tick in currTime
 
@@ -82,8 +89,9 @@ int main(int argc, char *argv[])
                 }else{
                     message.moreProcess=0;
                 }
-
+                printf(" i will send");
                 val = msgsnd(msgq_id_SPG, &message, sizeof(message.processObj), !IPC_NOWAIT);
+                printf("sent");
                 if (val == -1){
                     perror("Errror in send");
                 }

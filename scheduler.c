@@ -3,6 +3,7 @@
 int main(int argc, char *argv[])
 {
     initClk();
+        
     //create message queue to communicate process_generator.c with schduler.c
     int msgq_id_SPG = msgget(Q1KEY, 0666 | IPC_CREAT);
     if (msgq_id_SPG == -1)
@@ -18,7 +19,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     //create message queue to communicate scheduler.c with memory.c
-    int msgq_id_SM = msgget(Q3KEY, 0666 | IPC_CREAT);
+    int msgq_id_SM = msgget(Q3KEY, 0664 | IPC_CREAT);
     if (msgq_id_SM == -1)
     {
         perror("Error in create SM");
@@ -511,6 +512,7 @@ int main(int argc, char *argv[])
     else if (selectAlgo == 5)
     { //RR Round Robin Algorithm
         msgbuff message;
+        struct memobuff toMemory;
         pbuff processMessage;
         queue readyQueue;    //queue for ready processes
         queue finishedQueue; //queue for finished processes
@@ -539,12 +541,14 @@ int main(int argc, char *argv[])
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
             {
+                printf("here");
                 if (message.allProcessesGenerated == 2)
                 {
                     flag = 0;
                 }
                 else
                 {
+                    printf("else");
                     message.processObj.runtime = 0; //Didn't run before so intialize it to zero
                     message.processObj.forked = 0;  //Wasn't forked before
                     message.processObj.real = 1;    //Wasn't forked before
@@ -552,6 +556,7 @@ int main(int argc, char *argv[])
                     NumberOfProcesses++;
                     while (message.moreProcess)
                     {
+                        printf("more");
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         message.processObj.runtime = 0; //Didn't run before so intialize it to zero
                         enqueue(&readyQueue, message.processObj);
@@ -565,6 +570,7 @@ int main(int argc, char *argv[])
             }
             if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
             { //if it's a new time step run process with the currTurn
+            printf("if here");
                 currTime = Clk;
 
                 if (!isempty(&finishedQueue))
@@ -591,19 +597,27 @@ int main(int argc, char *argv[])
                     /* To avoid multiple forking for the same process */
                     if (!currProcess.forked)
                     {
+                        printf("Sending MEMO Req \n");
                         /*First time for process to fork so check here if there is enough memory for the process*/
                         memoRequest.finished=0;
-                        memoRequest.algorithmNum=1;
-                        memoRequest.memorySize=currProcess.remain;
-                        val=msgsnd(msgq_id_SM,&memoRequest,sizeof(memoRequest),!IPC_NOWAIT);//sending request to allocate the process
+                        // memoRequest.algorithmNum=selectMemo;
+                        memoRequest.memorySize=currProcess.memsize;
+                        printf("sending now \n");
+                        toMemory.m=memoRequest;
+                        toMemory.mtype=8282;
+                        val=msgsnd(msgq_id_SM,&toMemory,sizeof(toMemory.m),!IPC_NOWAIT);//sending request to allocate the process
+                        printf("after send");
                         if(val==-1){
                             printf("error while sending memo request");
                         }
-                        val = msgrcv(msgq_id_SM, &memoRequest, sizeof(memoRequest), 0, !IPC_NOWAIT);//recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        
+                        val = msgrcv(msgq_id_SM, &toMemory, sizeof(toMemory.m), 8282, !IPC_NOWAIT);//recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        memoRequest=toMemory.m;
                         if(val==-1){
                             printf("error while recv memo request");
                         }
                         if(memoRequest.finished==1){//means there is available memo so fork the process
+                            printf("accepted from memo \n");
                             currProcess.pid = fork();
                             currProcess.forked = 1;
                             currProcess.startTime = Clk;
@@ -661,6 +675,7 @@ int main(int argc, char *argv[])
     fclose(mFile);
 
     msgctl(msgq_id_SP, IPC_RMID, (struct msqid_ds *)0);
+    msgctl(msgq_id_SM, IPC_RMID, (struct msqid_ds *)0);
 
     //TODO: implement the scheduler.
     //TODO: upon termination release the clock resources.
