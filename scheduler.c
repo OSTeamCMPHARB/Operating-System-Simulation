@@ -3,28 +3,15 @@
 int main(int argc, char *argv[])
 {
     initClk();
-        
+
     //create message queue to communicate process_generator.c with schduler.c
-    int msgq_id_SPG = msgget(Q1KEY, 0666 | IPC_CREAT);
-    if (msgq_id_SPG == -1)
-    {
-        perror("Error in create SPG");
-        exit(-1);
-    }
+    int msgq_id_SPG = getID_SPG();
     //create message queue to communicate schduler.c with process.c
-    int msgq_id_SP = msgget(Q2KEY, 0666 | IPC_CREAT);
-    if (msgq_id_SP == -1)
-    {
-        perror("Error in create SP");
-        exit(-1);
-    }
+    int msgq_id_SP = getID_SP();
     //create message queue to communicate scheduler.c with memory.c
-    int msgq_id_SM = msgget(Q3KEY, 0664 | IPC_CREAT);
-    if (msgq_id_SM == -1)
-    {
-        perror("Error in create SM");
-        exit(-1);
-    }
+    int msgq_id_SM = getID_SM();
+    int msgq_id_MS = getID_MS();
+
     int val;
     int currTime = getClk();
     int selectAlgo = atoi(argv[1]);
@@ -35,7 +22,7 @@ int main(int argc, char *argv[])
     //writing output in memory.log
     FILE *mFile;
     mFile = fopen("memory.log", "w");
-    fprintf(mFile, "#At\ttime\tx\tallocated\ty\tbytes\t\tfor process\tz\tfrom\ti\tto\tj \n");
+    fprintf(mFile, "#At\ttime\tx\tallocated\ty\tbytes\tfor process\tz\tfrom\ti\tto\tj \n");
 
     // for CPU utilization and Average WTA & Waiting time//
     FILE *perfFile;
@@ -45,6 +32,10 @@ int main(int argc, char *argv[])
     int NumberOfProcesses = 0;
     int usefulTime = 0;
 
+    char path[256];
+    getcwd(path, sizeof(path));
+    strcat(path, "/process.out");
+    
     if (selectAlgo == 1)
     { //FCFS First Come First Serve
         msgbuff message;
@@ -100,7 +91,7 @@ int main(int argc, char *argv[])
                 processRunning->pid = fork();
                 if (processRunning->pid == 0)
                 {
-                    execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                    execl(path, "process.out", NULL);
                 }
                 finishTime = getClk() + processRunning->runtime;
 
@@ -200,7 +191,7 @@ int main(int argc, char *argv[])
                 processRunning->pid = fork();
                 if (processRunning->pid == 0)
                 {
-                    execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                    execl(path, "process.out", NULL);
                 }
                 finishTime = getClk() + processRunning->runtime;
 
@@ -303,7 +294,7 @@ int main(int argc, char *argv[])
                         processRunning->pid = fork();
                         if (processRunning->pid == 0)
                         {
-                            execl("/home/ghraboly/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
+                            execl(path, "process.out", NULL);
                         }
                         processRunning->wait = getClk() - processRunning->arrival;
                         finishTime = getClk() + processRunning->remain;
@@ -337,7 +328,7 @@ int main(int argc, char *argv[])
                             processRunning->pid = fork();
                             if (processRunning->pid == 0)
                             {
-                                execl("/home/ghraboly/Desktop/OS_Scheduler-main/process.out", "process.out", NULL);
+                                execl(path, "process.out", NULL);
                             }
                             processRunning->wait = getClk() - processRunning->arrival;
                             finishTime = getClk() + processRunning->remain;
@@ -435,7 +426,7 @@ int main(int argc, char *argv[])
                         processRunning->pid = fork();
                         if (processRunning->pid == 0)
                         {
-                            execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                            execl(path, "process.out", NULL);
                         }
                         processRunning->wait = getClk() - processRunning->arrival;
                         finishTime = getClk() + processRunning->remain;
@@ -468,7 +459,7 @@ int main(int argc, char *argv[])
                             processRunning->pid = fork();
                             if (processRunning->pid == 0)
                             {
-                                execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                                execl(path, "process.out", NULL);
                             }
                             processRunning->wait = getClk() - processRunning->arrival;
                             finishTime = getClk() + processRunning->remain;
@@ -510,13 +501,14 @@ int main(int argc, char *argv[])
         }
     }
     else if (selectAlgo == 5)
-    { //RR Round Robin Algorithm
+    {
+
+        //RR Round Robin Algorithm
         msgbuff message;
-        struct memobuff toMemory;
+        memoBuff memoMessage;
         pbuff processMessage;
         queue readyQueue;    //queue for ready processes
         queue finishedQueue; //queue for finished processes
-        struct mbuff memoRequest;
         initialize(&readyQueue);
         initialize(&finishedQueue);
 
@@ -541,14 +533,14 @@ int main(int argc, char *argv[])
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
             {
-                printf("here");
+                printf("here\n");
                 if (message.allProcessesGenerated == 2)
                 {
                     flag = 0;
                 }
                 else
                 {
-                    printf("else");
+
                     message.processObj.runtime = 0; //Didn't run before so intialize it to zero
                     message.processObj.forked = 0;  //Wasn't forked before
                     message.processObj.real = 1;    //Wasn't forked before
@@ -559,6 +551,7 @@ int main(int argc, char *argv[])
                         printf("more");
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         message.processObj.runtime = 0; //Didn't run before so intialize it to zero
+
                         enqueue(&readyQueue, message.processObj);
                         NumberOfProcesses++;
                     }
@@ -570,7 +563,7 @@ int main(int argc, char *argv[])
             }
             if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
             { //if it's a new time step run process with the currTurn
-            printf("if here");
+
                 currTime = Clk;
 
                 if (!isempty(&finishedQueue))
@@ -583,13 +576,26 @@ int main(int argc, char *argv[])
                     WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                     TotalWait += currProcess.wait;
                     TotalWTA += WTA;
+                    //toMemory.m.start=currProcess
+                    memoMessage.mtype = 2;
+                    memoMessage.m.proccesID = currProcess.id;
+                    memoMessage.m.memorySize = currProcess.memsize;
+                    memoMessage.m.start = currProcess.address;
+                    val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);
+                    if (val == -1)
+                    {
+                        printf("error while sending memo request");
+                    }
+
+                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoMessage.m.memorySize, memoMessage.m.proccesID, memoMessage.m.start, memoMessage.m.start + memoMessage.m.memorySize - 1);
+
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
                 }
 
                 if (!isempty(&readyQueue))
                 {
                     currProcess = dequeue(&readyQueue); //sending signal continue to process
-                    if (currProcess.forked)//if forked before & was stopped continue it
+                    if (currProcess.forked)             //if forked before & was stopped continue it
                     {
                         kill(SIGCONT, currProcess.pid);
                     }
@@ -597,40 +603,48 @@ int main(int argc, char *argv[])
                     /* To avoid multiple forking for the same process */
                     if (!currProcess.forked)
                     {
-                        printf("Sending MEMO Req \n");
+
                         /*First time for process to fork so check here if there is enough memory for the process*/
-                        memoRequest.finished=0;
+
                         // memoRequest.algorithmNum=selectMemo;
-                        memoRequest.memorySize=currProcess.memsize;
-                        printf("sending now \n");
-                        toMemory.m=memoRequest;
-                        toMemory.mtype=8282;
-                        val=msgsnd(msgq_id_SM,&toMemory,sizeof(toMemory.m),!IPC_NOWAIT);//sending request to allocate the process
-                        printf("after send");
-                        if(val==-1){
-                            printf("error while sending memo request");
+
+                        memoMessage.mtype = 3;
+                        memoMessage.m.memorySize = currProcess.memsize;
+                        memoMessage.m.proccesID = currProcess.id;
+
+                        val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT); //sending request to allocate the process
+                        if (val == -1)
+                        {
+                            printf("error while sending memo request\n");
                         }
-                        
-                        val = msgrcv(msgq_id_SM, &toMemory, sizeof(toMemory.m), 8282, !IPC_NOWAIT);//recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
-                        memoRequest=toMemory.m;
-                        if(val==-1){
-                            printf("error while recv memo request");
+
+                        val = msgrcv(msgq_id_MS, &memoMessage, sizeof(memoMessage) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        if (val == -1)
+                        {
+
+                            printf("error while recv memo request\n");
                         }
-                        if(memoRequest.finished==1){//means there is available memo so fork the process
+
+                        if (memoMessage.mtype == 1)
+                        { //means there is available memo so fork the process
                             printf("accepted from memo \n");
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoMessage.m.memorySize, memoMessage.m.proccesID, memoMessage.m.start, memoMessage.m.start + memoMessage.m.memorySize - 1);
+
                             currProcess.pid = fork();
-                            currProcess.forked = 1;
-                            currProcess.startTime = Clk;
-                            /*if this is the child process make it execute the currProcess*/
                             if (currProcess.pid == 0)
                             {
-                                execl("/home/hazem/Desktop/OS_Scheduler-main1/process.out", "process.out", NULL);
+                                execl(path, "process.out", NULL);
                             }
-                        }else{//means there is no avaiable memory
-                            //----EDIT LATER add the waiting for memo space 
-                            enqueue(&readyQueue,currProcess); //sending signal continue to process
+                            currProcess.forked = 1;
+                            currProcess.startTime = Clk;
+                            currProcess.address = memoMessage.m.start;
+                            /*if this is the child process make it execute the currProcess*/
                         }
-                        
+                        else
+                        { //means there is no avaiable memory
+                            //----EDIT LATER add the waiting for memo space
+                            enqueue(&readyQueue, currProcess); //sending signal continue to process
+                        }
                     }
                     printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.pid, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
                     printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
@@ -666,6 +680,8 @@ int main(int argc, char *argv[])
                 }
             }
         }
+        memoMessage.mtype = 1;
+        val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage.m), !IPC_NOWAIT);
     }
 
     float CPU_utilization = ((float)usefulTime / (getClk() - 1)) * 100;
@@ -674,10 +690,7 @@ int main(int argc, char *argv[])
     fclose(pFile);
     fclose(mFile);
 
-    msgctl(msgq_id_SP, IPC_RMID, (struct msqid_ds *)0);
-    msgctl(msgq_id_SM, IPC_RMID, (struct msqid_ds *)0);
-
-    //TODO: implement the scheduler.
+     //TODO: implement the scheduler.
     //TODO: upon termination release the clock resources.
 
     destroyClk(true);

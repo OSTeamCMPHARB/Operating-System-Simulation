@@ -17,7 +17,8 @@
 typedef short bool;
 typedef struct msgbuff msgbuff;
 typedef struct pbuff pbuff;
-
+typedef struct memoBuff memoBuff;
+typedef struct memom memom;
 
 #define true 1
 #define false 0
@@ -25,7 +26,8 @@ typedef struct pbuff pbuff;
 #define SHKEY 300
 #define Q1KEY 111
 #define Q2KEY 222
-#define Q3KEY 444
+#define Q3KEY 4443
+#define Q4KEY 4444
 
 ///==============================
 //don't mess with this variable//
@@ -54,6 +56,48 @@ void initClk()
     shmaddr = (int *)shmat(shmid, (void *)0, 0);
 }
 
+int getID_SPG()
+{
+    int id = msgget(Q1KEY, 0666 | IPC_CREAT);
+    if (id == -1)
+    {
+        perror("Error in create SPG");
+        exit(-1);
+    }
+    return id;
+}
+int getID_SP()
+{
+    int id = msgget(Q2KEY, 0666 | IPC_CREAT);
+    if (id == -1)
+    {
+        perror("Error in create SPG");
+        exit(-1);
+    }
+    return id;
+}
+int getID_SM()
+{
+    int id = msgget(Q3KEY, 0666 | IPC_CREAT);
+    if (id == -1)
+    {
+        perror("Error in create SPG");
+        exit(-1);
+    }
+    return id;
+}
+int getID_MS()
+{
+    int id = msgget(Q4KEY, 0666 | IPC_CREAT);
+    if (id == -1)
+    {
+        perror("Error in create SPG");
+        exit(-1);
+    }
+    return id;
+}
+
+
 /*
  * All processes call this function at the end to release the communication
  * resources between them and the clock module.
@@ -72,7 +116,7 @@ void destroyClk(bool terminateAll)
 }
 struct msgbuff
 {
-    int allProcessesGenerated;// 1 means not finished yet | 2 means finished generating
+    int allProcessesGenerated; // 1 means not finished yet | 2 means finished generating
     struct process processObj;
     int moreProcess;
 };
@@ -83,16 +127,15 @@ struct pbuff
     int remainingTime;
 };
 
-struct mbuff
+struct memom
 {
-    long algorithmNum;
     int memorySize;
-    int start;
-    int finished;/* 0= program isn't finished         1= program finished          2= deallocate this memory    from scheduler to memory
-                    0= NO enough space were found           1= YES enough memory were found                     from memory to scheduler  */
+    int start; // start index
+    int proccesID;
 };
 
-struct memobuff{
-    long mtype;
-    struct mbuff m;
+struct memoBuff
+{
+    long mtype; //1 means break (terminate memory.c)  2 means deallocate memory  3 means requset to allocate memory 
+    memom m;
 };

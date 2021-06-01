@@ -6,12 +6,7 @@ int remainingtime;
 int main(int agrc, char *argv[])
 {
     initClk();
-    int msgq_id_SP = msgget(Q2KEY, 0666 | IPC_CREAT);
-    if (msgq_id_SP == -1)
-    {
-        perror("Error in create");
-        exit(-1);
-    }
+    int msgq_id_SP = getID_SP();
     int val;
     struct pbuff message;
     int type = getpid() % 100000;

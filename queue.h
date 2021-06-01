@@ -8,6 +8,7 @@ struct process
     int id;
     int memsize;
     int memoryWait;
+    int address;
     int arrival;
     int runtime;
     int priority;
