@@ -501,9 +501,7 @@ int main(int argc, char *argv[])
         }
     }
     else if (selectAlgo == 5)
-    {
-
-        //RR Round Robin Algorithm
+    {//RR Round Robin Algorithm
         msgbuff message;
         memoBuff memoMessage;
         pbuff processMessage;
@@ -533,7 +531,7 @@ int main(int argc, char *argv[])
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
             {
-                printf("here\n");
+                //printf("here\n");
                 if (message.allProcessesGenerated == 2)
                 {
                     flag = 0;
@@ -548,7 +546,7 @@ int main(int argc, char *argv[])
                     NumberOfProcesses++;
                     while (message.moreProcess)
                     {
-                        printf("more");
+                        //printf("more");
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         message.processObj.runtime = 0; //Didn't run before so intialize it to zero
 
@@ -565,13 +563,14 @@ int main(int argc, char *argv[])
             { //if it's a new time step run process with the currTurn
 
                 currTime = Clk;
-
+                
+                //------------------------- FINISHED PROCESSES HANDLING --------------------------//
                 if (!isempty(&finishedQueue))
                 { //If process is finished
                     currProcess = dequeue(&finishedQueue);
                     currProcess.real = 0;
                     currProcess.finishTime = Clk;
-                    currProcess.wait = currProcess.finishTime - currProcess.startTime - currProcess.runtime;
+                    currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime ;//EDITED
                     TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
                     WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                     TotalWait += currProcess.wait;
@@ -581,7 +580,7 @@ int main(int argc, char *argv[])
                     memoMessage.m.proccesID = currProcess.id;
                     memoMessage.m.memorySize = currProcess.memsize;
                     memoMessage.m.start = currProcess.address;
-                    val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);
+                    val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);//Deallocate the memory
                     if (val == -1)
                     {
                         printf("error while sending memo request");
@@ -591,6 +590,7 @@ int main(int argc, char *argv[])
 
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
                 }
+
 
                 if (!isempty(&readyQueue))
                 {
@@ -605,8 +605,6 @@ int main(int argc, char *argv[])
                     {
 
                         /*First time for process to fork so check here if there is enough memory for the process*/
-
-                        // memoRequest.algorithmNum=selectMemo;
 
                         memoMessage.mtype = 3;
                         memoMessage.m.memorySize = currProcess.memsize;
@@ -627,7 +625,7 @@ int main(int argc, char *argv[])
 
                         if (memoMessage.mtype == 1)
                         { //means there is available memo so fork the process
-                            printf("accepted from memo \n");
+                            //printf("accepted from memo \n");
                             fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoMessage.m.memorySize, memoMessage.m.proccesID, memoMessage.m.start, memoMessage.m.start + memoMessage.m.memorySize - 1);
 
                             currProcess.pid = fork();
@@ -642,7 +640,6 @@ int main(int argc, char *argv[])
                         }
                         else
                         { //means there is no avaiable memory
-                            //----EDIT LATER add the waiting for memo space
                             enqueue(&readyQueue, currProcess); //sending signal continue to process
                         }
                     }

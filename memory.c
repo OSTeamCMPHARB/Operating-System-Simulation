@@ -44,10 +44,10 @@ int main(int agrc, char *argv[])
                 }
                 else
                 {
-                    printf("computing in memo \n");
+                    //printf("computing in memo \n");
                     int counter = 0;
                     int i = 0;
-                    int spaceFound = false;
+                    int spaceFound = 0;
                     int start = 0;
                     while (counter < message.m.memorySize && i < 1024 && !spaceFound)
                     {
@@ -60,7 +60,7 @@ int main(int agrc, char *argv[])
                                 i++;
                                 if (counter >= message.m.memorySize)
                                 {                      //checking if we found a space for process
-                                    spaceFound = true; //will make me exit both loops & send to scheduler that the memory needed is available
+                                    spaceFound = 1; //will make me exit both loops & send to scheduler that the memory needed is available
                                     break;
                                 }
                             }
@@ -84,7 +84,8 @@ int main(int agrc, char *argv[])
                     {
                         message.mtype = 2; //used as true in case the space is not found
                     }
-                    printf("sending permission \n");
+                    //printf("sending permission \n");
+                    spaceFound=0;
                     val = msgsnd(msgq_id_MS, &message, sizeof(message) - sizeof(long), !IPC_NOWAIT);
                    
                 }
