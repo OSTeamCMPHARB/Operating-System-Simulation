@@ -27,22 +27,22 @@ int main(int agrc, char *argv[])
     { //First Fit Algorithm
         while (true)
         {
-            val = msgrcv(msgq_id_SM, &message, sizeof(message) - sizeof(long), 0, !IPC_NOWAIT); //recieving the request of memory allocation
+            val = msgrcv(msgq_id_SM, &message, sizeof(message) - sizeof(long), 0, !IPC_NOWAIT); //recieving the request of memory allocation 3=allocate / 1=terminate / 2=deallocate
             if (val != 0)
             {
                 if (message.mtype == 1)
                 {
-                    break;
+                    break;//terminate program is finished
                 }
                 else if (message.mtype == 2)
-                {
+                {//deallocate the following memory
                     for (int i = message.m.start; i < message.m.memorySize + message.m.start; i++)
                     {
                         memory[i] = false;
                     }
 
                 }
-                else
+                else if(message.mtype==3)
                 {
                     //printf("computing in memo \n");
                     int counter = 0;
@@ -82,12 +82,12 @@ int main(int agrc, char *argv[])
                     }
                     else
                     {
-                        message.mtype = 2; //used as true in case the space is not found
+                        message.m.start=-1;
                     }
                     //printf("sending permission \n");
-                    spaceFound=0;
+                    
                     val = msgsnd(msgq_id_MS, &message, sizeof(message) - sizeof(long), !IPC_NOWAIT);
-                   
+                    spaceFound=0;
                 }
             }
         }

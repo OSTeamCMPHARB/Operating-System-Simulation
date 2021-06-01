@@ -501,9 +501,9 @@ int main(int argc, char *argv[])
         }
     }
     else if (selectAlgo == 5)
-    {//RR Round Robin Algorithm
+    { //RR Round Robin
+        memoBuff memoRequests;
         msgbuff message;
-        memoBuff memoMessage;
         pbuff processMessage;
         queue readyQueue;    //queue for ready processes
         queue finishedQueue; //queue for finished processes
@@ -531,14 +531,12 @@ int main(int argc, char *argv[])
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
             {
-                //printf("here\n");
                 if (message.allProcessesGenerated == 2)
                 {
                     flag = 0;
                 }
                 else
                 {
-
                     message.processObj.runtime = 0; //Didn't run before so intialize it to zero
                     message.processObj.forked = 0;  //Wasn't forked before
                     message.processObj.real = 1;    //Wasn't forked before
@@ -546,10 +544,10 @@ int main(int argc, char *argv[])
                     NumberOfProcesses++;
                     while (message.moreProcess)
                     {
-                        //printf("more");
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
                         message.processObj.runtime = 0; //Didn't run before so intialize it to zero
-
+                        message.processObj.forked = 0;  //Wasn't forked before
+                        message.processObj.real = 1;    //Wasn't forked before
                         enqueue(&readyQueue, message.processObj);
                         NumberOfProcesses++;
                     }
@@ -561,89 +559,73 @@ int main(int argc, char *argv[])
             }
             if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
             { //if it's a new time step run process with the currTurn
-
                 currTime = Clk;
-                
-                //------------------------- FINISHED PROCESSES HANDLING --------------------------//
+
                 if (!isempty(&finishedQueue))
                 { //If process is finished
                     currProcess = dequeue(&finishedQueue);
+                    memoRequests.m.memorySize=currProcess.memsize;
+                    memoRequests.m.proccesID=currProcess.id;
+                    memoRequests.m.start=currProcess.address;
+                    memoRequests.mtype=2;
+                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, memoRequests.m.proccesID, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+
+                    val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT);//deallocate the memory
+                    if(val==-1){
+                        perror("error while deallocating request");
+                    }
                     currProcess.real = 0;
                     currProcess.finishTime = Clk;
-                    currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime ;//EDITED
+                    currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
                     TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
                     WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                     TotalWait += currProcess.wait;
                     TotalWTA += WTA;
-                    //toMemory.m.start=currProcess
-                    memoMessage.mtype = 2;
-                    memoMessage.m.proccesID = currProcess.id;
-                    memoMessage.m.memorySize = currProcess.memsize;
-                    memoMessage.m.start = currProcess.address;
-                    val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);//Deallocate the memory
-                    if (val == -1)
-                    {
-                        printf("error while sending memo request");
-                    }
-
-                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoMessage.m.memorySize, memoMessage.m.proccesID, memoMessage.m.start, memoMessage.m.start + memoMessage.m.memorySize - 1);
-
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
+                    
+                    if(isempty(&finishedQueue) && isempty(&readyQueue) && flag==0){
+                        memoRequests.mtype=1;
+                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT);//deallocate the memory
+                    }
                 }
-
 
                 if (!isempty(&readyQueue))
                 {
                     currProcess = dequeue(&readyQueue); //sending signal continue to process
-                    if (currProcess.forked)             //if forked before & was stopped continue it
+                    if (currProcess.forked==1)
                     {
                         kill(SIGCONT, currProcess.pid);
                     }
 
                     /* To avoid multiple forking for the same process */
-                    if (!currProcess.forked)
+                    if (currProcess.forked !=1)
                     {
-
-                        /*First time for process to fork so check here if there is enough memory for the process*/
-
-                        memoMessage.mtype = 3;
-                        memoMessage.m.memorySize = currProcess.memsize;
-                        memoMessage.m.proccesID = currProcess.id;
-
-                        val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT); //sending request to allocate the process
-                        if (val == -1)
-                        {
-                            printf("error while sending memo request\n");
+                        memoRequests.m.memorySize=currProcess.memsize;
+                        memoRequests.m.proccesID=currProcess.id;
+                        memoRequests.m.start=-1;
+                        memoRequests.mtype=3;
+                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT);//allocate the memory
+                        if(val==-1){
+                            perror("failed to send request to memo");
                         }
-
-                        val = msgrcv(msgq_id_MS, &memoMessage, sizeof(memoMessage) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
-                        if (val == -1)
-                        {
-
-                            printf("error while recv memo request\n");
-                        }
-
-                        if (memoMessage.mtype == 1)
-                        { //means there is available memo so fork the process
-                            //printf("accepted from memo \n");
-                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoMessage.m.memorySize, memoMessage.m.proccesID, memoMessage.m.start, memoMessage.m.start + memoMessage.m.memorySize - 1);
-
+                        val=msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        if(memoRequests.m.start!=-1){
+                            
                             currProcess.pid = fork();
-                            if (currProcess.pid == 0)
-                            {
-                                execl(path, "process.out", NULL);
-                            }
                             currProcess.forked = 1;
                             currProcess.startTime = Clk;
-                            currProcess.address = memoMessage.m.start;
+                            currProcess.address=memoRequests.m.start;
+
                             /*if this is the child process make it execute the currProcess*/
-                        }
-                        else
-                        { //means there is no avaiable memory
-                            enqueue(&readyQueue, currProcess); //sending signal continue to process
+                            if (currProcess.pid == 0)
+                            {
+                                execl("/home/hazem/Desktop/OS/process.out", "process.out", NULL);
+                            }
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, memoRequests.m.proccesID, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                            printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
                         }
                     }
-                    printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.pid, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                    
                     printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
                     if (currProcess.remain > 0)
@@ -677,8 +659,6 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        memoMessage.mtype = 1;
-        val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage.m), !IPC_NOWAIT);
     }
 
     float CPU_utilization = ((float)usefulTime / (getClk() - 1)) * 100;
@@ -689,6 +669,7 @@ int main(int argc, char *argv[])
 
      //TODO: implement the scheduler.
     //TODO: upon termination release the clock resources.
-
+//val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);//Deallocate the memory
+//val = msgrcv(msgq_id_MS, &memoMessage, sizeof(memoMessage) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
     destroyClk(true);
 }
