@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
                         kill(processRunning->pid, SIGSTOP);
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
-                        enqueuepriority(&readyQueue, currProcess, message.processObj.priority); //change
+                        enqueuepriority(&readyQueue, currProcess, processRunning->priority); //change
                         currProcess = dequeuepriority(&readyQueue);
                         processRunning = &currProcess;
                         if (processRunning->isblocked == 1)
@@ -444,7 +444,7 @@ int main(int argc, char *argv[])
                         kill(processRunning->pid, SIGSTOP);
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
-                        enqueuepriority(&readyQueue, currProcess, message.processObj.runtime); //change
+                        enqueuepriority(&readyQueue, currProcess, processRunning->remain); //change
                         currProcess = dequeuepriority(&readyQueue);
                         processRunning = &currProcess;
                         if (processRunning->isblocked == 1)
@@ -619,7 +619,7 @@ int main(int argc, char *argv[])
                             /*if this is the child process make it execute the currProcess*/
                             if (currProcess.pid == 0)
                             {
-                                execl("/home/hazem/Desktop/OS/process.out", "process.out", NULL);
+                                execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
                             }
                             fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, memoRequests.m.proccesID, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
                             printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
