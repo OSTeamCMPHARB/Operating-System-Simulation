@@ -12,4 +12,5 @@ clean:
 all: clean build
 
 run:
-	./process_generator.out 5 2
+	./process_generator.out 4 3
+

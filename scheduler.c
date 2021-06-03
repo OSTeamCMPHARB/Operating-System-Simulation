@@ -371,6 +371,11 @@ int main(int argc, char *argv[])
     }
     else if (selectAlgo == 4)
     { //SRTN Shortest Remaining Time Next
+        memoBuff memoRequestSend;
+        memoBuff memoRequestRecieve;
+        priorityqueue temp;
+        initializepriority(&temp);
+
         msgbuff message;
         pbuff pmessage;
         priorityqueue readyQueue;
@@ -412,8 +417,51 @@ int main(int argc, char *argv[])
             {
                 if (processRunning == NULL)
                 {
-                    currProcess = dequeuepriority(&readyQueue);
-                    processRunning = &currProcess;
+                    while(!isemptypriority(&readyQueue))
+                    {
+                        currProcess = dequeuepriority(&readyQueue);
+                        if(currProcess.isblocked == 1)
+                        {
+                            processRunning = &currProcess;
+                            while(!isemptypriority(&temp))
+                            {
+                                process tempProc = dequeuepriority(&temp);
+                                enqueuepriority(&readyQueue, tempProc, tempProc.remain);
+                            }
+                            break;
+                        }
+                        memoRequestSend.m.memorySize = currProcess.memsize;
+                        memoRequestSend.m.proccesID = currProcess.id;
+                        memoRequestSend.m.start = -1;
+                        memoRequestSend.mtype = 3;
+                        val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
+                        printf("after send 1 \n");
+                        val = msgrcv(msgq_id_MS, &memoRequestRecieve, sizeof(memoRequestRecieve) - sizeof(long), 0, !IPC_NOWAIT);
+                        printf("after recieve 1 \n"); 
+                        if(val == -1) 
+                        {
+                            printf("error in communication with memory");
+                        }
+                        if(memoRequestRecieve.m.start == -1)
+                        {
+                            enqueuepriority(&temp, currProcess, currProcess.remain);
+                        }
+                        else
+                        {
+                            currProcess.address = memoRequestRecieve.m.start;
+                            processRunning = &currProcess;
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestRecieve.m.memorySize, memoRequestRecieve.m.proccesID, memoRequestRecieve.m.start, memoRequestRecieve.m.start + memoRequestRecieve.m.memorySize - 1);
+                            while(!isemptypriority(&temp))
+                            {
+                                process tempProc = dequeuepriority(&temp);
+                                enqueuepriority(&readyQueue, tempProc, tempProc.remain);
+                            }
+                            break;
+                        }
+                    }
+
+                    //currProcess = dequeuepriority(&readyQueue);
+                    //processRunning = &currProcess;
                     if (processRunning->isblocked == 1)
                     {
                         kill(processRunning->pid, SIGCONT);
@@ -422,7 +470,7 @@ int main(int argc, char *argv[])
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                     }
                     else
-                    {
+                    {   
                         processRunning->pid = fork();
                         if (processRunning->pid == 0)
                         {
@@ -438,8 +486,38 @@ int main(int argc, char *argv[])
                     val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                 }
                 else
-                {
-                    if (processRunning->remain > beek(&readyQueue)->remain) //change
+                {   
+                    bool enterflag = true;
+                    process* tempPtr = beek(&readyQueue);
+                    if(tempPtr->isblocked != 1 && processRunning->remain > tempPtr->remain)
+                    {
+                        memoRequestSend.m.memorySize = tempPtr->memsize;
+                        memoRequestSend.m.proccesID = tempPtr->id;
+                        memoRequestSend.m.start = -1;
+                        memoRequestSend.mtype = 3;
+                        val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
+                        printf("after send 2 \n");
+                        if(val == -1)
+                        {
+                            printf("error while sending to memory");
+                        }
+                        val = msgrcv(msgq_id_MS, &memoRequestRecieve, sizeof(memoRequestRecieve) - sizeof(long), 0, !IPC_NOWAIT);
+                        printf("after recieve 2 \n");
+                        if(val == -1)
+                        {
+                            printf("error while recieve from memory");
+                        }
+                        if(memoRequestRecieve.m.start == -1)
+                        {
+                            enterflag = false;
+                        }
+                        else
+                        {
+                            tempPtr->address = memoRequestRecieve.m.start;
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestRecieve.m.memorySize, memoRequestRecieve.m.proccesID, memoRequestRecieve.m.start, memoRequestRecieve.m.start + memoRequestRecieve.m.memorySize - 1);
+                        }
+                    }
+                    if (processRunning->remain > beek(&readyQueue)->remain && enterflag) //change
                     {
                         kill(processRunning->pid, SIGSTOP);
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
@@ -455,7 +533,7 @@ int main(int argc, char *argv[])
                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         }
                         else
-                        {
+                        {   
                             processRunning->pid = fork();
                             if (processRunning->pid == 0)
                             {
@@ -493,11 +571,29 @@ int main(int argc, char *argv[])
                         TotalWait += processRunning->wait;
                         TotalWTA += WTA;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait, TA, WTA);
+                        memoRequestSend.m.memorySize = currProcess.memsize;
+                        memoRequestSend.m.proccesID = currProcess.id;
+                        memoRequestSend.m.start = currProcess.address;
+                        memoRequestSend.mtype = 2;
+                        val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestSend.m.memorySize, memoRequestSend.m.proccesID, memoRequestSend.m.start, memoRequestSend.m.start + memoRequestSend.m.memorySize - 1);
+                        printf("after send 3 \n");
+                        if(val == -1)
+                        {
+                            printf("error while sending to memory at dealocation");
+                        }
                         processRunning = NULL;
                     }
                 }
             }
             //////////////////////////////////////////////////end trial
+        }
+
+        memoRequestSend.mtype = 1;
+        val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
+        if(val == -1)
+        {
+            printf("error while sending to memory at the end");
         }
     }
     else if (selectAlgo == 5)
