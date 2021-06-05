@@ -110,19 +110,21 @@ int main(int argc, char *argv[])
     {
         perror("Errror in send");
     }
+    
     // wait for scheduler to finish its job
-    sleep(100);
+    int stat_loc;
+    waitpid(pid[1], &stat_loc, 0);
 
     destroyClk(true);
 }
 
 void clearResources(int signum)
 {
+    destroyClk(true);
     msgctl(msgq_id_SPG, IPC_RMID, (struct msqid_ds *)0);
     msgctl(getID_SP(), IPC_RMID, (struct msqid_ds *)0);
     msgctl(getID_MS(), IPC_RMID, (struct msqid_ds *)0);
     msgctl(getID_SM(), IPC_RMID, (struct msqid_ds *)0);
-    destroyClk(true);
     kill(getpid(), SIGKILL);
     //TODO Clears all resources in case of interruption
 }

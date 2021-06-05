@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     char path[256];
     getcwd(path, sizeof(path));
     strcat(path, "/process.out");
-    
+
     if (selectAlgo == 1)
     { //FCFS First Come First Serve
         msgbuff message;
@@ -43,17 +43,16 @@ int main(int argc, char *argv[])
         queue readyQueue;
         initialize(&readyQueue);
         int flag = 1;
-
         int TA = 0;
         float WTA = 0;
-
         process *processRunning = NULL;
         process currProcess;
+        memoBuff memoRequest;
         int finishTime = 0;
         currTime = 1;
         // while there are processes will come to the system OR there is processes not finshed yet
 
-        while ((flag == 1) || !isempty(&readyQueue) || (getClk() <= finishTime))
+        while ((flag == 1) || !isempty(&readyQueue) || processRunning != NULL)
         {
 
             // if there is a message from process_generator insert the arrived process in the queue
@@ -88,6 +87,19 @@ int main(int argc, char *argv[])
 
                 currProcess = dequeue(&readyQueue);
                 processRunning = &currProcess;
+                memoRequest.m.memorySize = currProcess.memsize;
+                memoRequest.m.start = -1;
+                memoRequest.mtype = 3;
+                val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
+                val = msgrcv(msgq_id_MS, &memoRequest, sizeof(memoRequest) - sizeof(long), 0, !IPC_NOWAIT);
+                if (val == -1)
+                    printf("error in recive\n");
+
+                currProcess.address = memoRequest.m.start;
+                currProcess.endAddress=memoRequest.m.end;
+                
+                fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(),processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
+
                 processRunning->pid = fork();
                 if (processRunning->pid == 0)
                 {
@@ -110,17 +122,24 @@ int main(int argc, char *argv[])
                 currTime = getClk();
 
                 printf("%d\n", currTime);
-                usefulTime++;
+                
                 if (processRunning != NULL)
                 {
                     // if there is process running decreamt remaing time then send it to this process
                     processRunning->remain--;
+                    usefulTime++;
 
                     pmessage.mtype = processRunning->pid % 100000;
                     pmessage.remainingTime = processRunning->remain;
                     val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                     if (processRunning->remain == 0)
                     {
+                          memoRequest.m.memorySize = processRunning->memsize;
+                            memoRequest.m.start = processRunning->address;
+                            memoRequest.m.end=processRunning->endAddress;
+                        memoRequest.mtype = 2;
+                         val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
                         // if the remaining time =0 set the run pointer to null to take anther process
                         printf(" run time %d \n", processRunning->remain);
                         TA = processRunning->wait + processRunning->runtime;
@@ -132,8 +151,13 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            // while time dosent change dont do any any thing (busy wait)
-            //  while (currTime == getClk()){}
+           
+        }
+             memoRequest.mtype = 1;
+        val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
+        if (val == -1)
+        {
+            printf("error while sending to memory at the end");
         }
     }
     else if (selectAlgo == 2)
@@ -153,7 +177,7 @@ int main(int argc, char *argv[])
         currTime = 1;
         // while there are processes will come to the system OR there is processes not finshed yet
 
-        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime))
+        while ((flag == 1) || !isemptypriority(&readyQueue) || (processRunning != NULL))
         {
 
             // if there is a message from process_generator insert the arrived process in the queue
@@ -249,7 +273,7 @@ int main(int argc, char *argv[])
         process currProcess;
         int finishTime = 0;
         currTime = 1;
-        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime))
+        while ((flag == 1) || !isemptypriority(&readyQueue) || (processRunning != NULL))
         {
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
@@ -345,9 +369,10 @@ int main(int argc, char *argv[])
             {
                 currTime = getClk();
                 printf("%d\n", currTime);
-                usefulTime++;
                 if (processRunning != NULL)
                 {
+                usefulTime++;
+
                     // if there is process running decreamt remaing time then send it to this process
                     processRunning->remain--;
                     pmessage.mtype = processRunning->pid % 100000;
@@ -387,7 +412,7 @@ int main(int argc, char *argv[])
         process currProcess;
         int finishTime = 0;
         currTime = 1;
-        while ((flag == 1) || !isemptypriority(&readyQueue) || (getClk() <= finishTime))
+        while ((flag == 1) || !isemptypriority(&readyQueue) || processRunning != NULL)
         {
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
             if (val != -1)
@@ -417,13 +442,13 @@ int main(int argc, char *argv[])
             {
                 if (processRunning == NULL)
                 {
-                    while(!isemptypriority(&readyQueue))
+                    while (!isemptypriority(&readyQueue))
                     {
                         currProcess = dequeuepriority(&readyQueue);
-                        if(currProcess.isblocked == 1)
+                        if (currProcess.isblocked == 1)
                         {
                             processRunning = &currProcess;
-                            while(!isemptypriority(&temp))
+                            while (!isemptypriority(&temp))
                             {
                                 process tempProc = dequeuepriority(&temp);
                                 enqueuepriority(&readyQueue, tempProc, tempProc.remain);
@@ -431,27 +456,27 @@ int main(int argc, char *argv[])
                             break;
                         }
                         memoRequestSend.m.memorySize = currProcess.memsize;
-                        memoRequestSend.m.proccesID = currProcess.id;
                         memoRequestSend.m.start = -1;
                         memoRequestSend.mtype = 3;
                         val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
                         printf("after send 1 \n");
                         val = msgrcv(msgq_id_MS, &memoRequestRecieve, sizeof(memoRequestRecieve) - sizeof(long), 0, !IPC_NOWAIT);
-                        printf("after recieve 1 \n"); 
-                        if(val == -1) 
+                        printf("after recieve 1 \n");
+                        if (val == -1)
                         {
                             printf("error in communication with memory");
                         }
-                        if(memoRequestRecieve.m.start == -1)
+                        if (memoRequestRecieve.m.start == -1)
                         {
                             enqueuepriority(&temp, currProcess, currProcess.remain);
                         }
                         else
                         {
                             currProcess.address = memoRequestRecieve.m.start;
+                            currProcess.endAddress=memoRequestRecieve.m.end;
                             processRunning = &currProcess;
-                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestRecieve.m.memorySize, memoRequestRecieve.m.proccesID, memoRequestRecieve.m.start, memoRequestRecieve.m.start + memoRequestRecieve.m.memorySize - 1);
-                            while(!isemptypriority(&temp))
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
+                            while (!isemptypriority(&temp))
                             {
                                 process tempProc = dequeuepriority(&temp);
                                 enqueuepriority(&readyQueue, tempProc, tempProc.remain);
@@ -470,7 +495,7 @@ int main(int argc, char *argv[])
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                     }
                     else
-                    {   
+                    {
                         processRunning->pid = fork();
                         if (processRunning->pid == 0)
                         {
@@ -486,35 +511,35 @@ int main(int argc, char *argv[])
                     val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                 }
                 else
-                {   
+                {
                     bool enterflag = true;
-                    process* tempPtr = beek(&readyQueue);
-                    if(tempPtr->isblocked != 1 && processRunning->remain > tempPtr->remain)
+                    process *tempPtr = beek(&readyQueue);
+                    if (tempPtr->isblocked != 1 && processRunning->remain > tempPtr->remain)
                     {
                         memoRequestSend.m.memorySize = tempPtr->memsize;
-                        memoRequestSend.m.proccesID = tempPtr->id;
                         memoRequestSend.m.start = -1;
                         memoRequestSend.mtype = 3;
                         val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
                         printf("after send 2 \n");
-                        if(val == -1)
+                        if (val == -1)
                         {
                             printf("error while sending to memory");
                         }
                         val = msgrcv(msgq_id_MS, &memoRequestRecieve, sizeof(memoRequestRecieve) - sizeof(long), 0, !IPC_NOWAIT);
                         printf("after recieve 2 \n");
-                        if(val == -1)
+                        if (val == -1)
                         {
                             printf("error while recieve from memory");
                         }
-                        if(memoRequestRecieve.m.start == -1)
+                        if (memoRequestRecieve.m.start == -1)
                         {
                             enterflag = false;
                         }
                         else
                         {
                             tempPtr->address = memoRequestRecieve.m.start;
-                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestRecieve.m.memorySize, memoRequestRecieve.m.proccesID, memoRequestRecieve.m.start, memoRequestRecieve.m.start + memoRequestRecieve.m.memorySize - 1);
+                            tempPtr->endAddress=memoRequestRecieve.m.end;
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), tempPtr->memsize, tempPtr->id, tempPtr->address, tempPtr->endAddress);
                         }
                     }
                     if (processRunning->remain > beek(&readyQueue)->remain && enterflag) //change
@@ -533,7 +558,7 @@ int main(int argc, char *argv[])
                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         }
                         else
-                        {   
+                        {
                             processRunning->pid = fork();
                             if (processRunning->pid == 0)
                             {
@@ -554,9 +579,10 @@ int main(int argc, char *argv[])
             {
                 currTime = getClk();
                 printf("%d\n", currTime);
-                usefulTime++;
                 if (processRunning != NULL)
                 {
+                usefulTime++;
+
                     // if there is process running decreamt remaing time then send it to this process
                     processRunning->remain--;
                     pmessage.mtype = processRunning->pid % 100000;
@@ -572,13 +598,13 @@ int main(int argc, char *argv[])
                         TotalWTA += WTA;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait, TA, WTA);
                         memoRequestSend.m.memorySize = currProcess.memsize;
-                        memoRequestSend.m.proccesID = currProcess.id;
                         memoRequestSend.m.start = currProcess.address;
+                        memoRequestSend.m.end=currProcess.endAddress;
                         memoRequestSend.mtype = 2;
                         val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
-                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequestSend.m.memorySize, memoRequestSend.m.proccesID, memoRequestSend.m.start, memoRequestSend.m.start + memoRequestSend.m.memorySize - 1);
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
                         printf("after send 3 \n");
-                        if(val == -1)
+                        if (val == -1)
                         {
                             printf("error while sending to memory at dealocation");
                         }
@@ -591,7 +617,7 @@ int main(int argc, char *argv[])
 
         memoRequestSend.mtype = 1;
         val = msgsnd(msgq_id_SM, &memoRequestSend, sizeof(memoRequestSend) - sizeof(long), !IPC_NOWAIT);
-        if(val == -1)
+        if (val == -1)
         {
             printf("error while sending to memory at the end");
         }
@@ -660,14 +686,14 @@ int main(int argc, char *argv[])
                 if (!isempty(&finishedQueue))
                 { //If process is finished
                     currProcess = dequeue(&finishedQueue);
-                    memoRequests.m.memorySize=currProcess.memsize;
-                    memoRequests.m.proccesID=currProcess.id;
-                    memoRequests.m.start=currProcess.address;
-                    memoRequests.mtype=2;
-                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, memoRequests.m.proccesID, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                    memoRequests.m.memorySize = currProcess.memsize;
+                    memoRequests.m.start = currProcess.address;
+                    memoRequests.mtype = 2;
+                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
 
-                    val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT);//deallocate the memory
-                    if(val==-1){
+                    val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
+                    if (val == -1)
+                    {
                         perror("error while deallocating request");
                     }
                     currProcess.real = 0;
@@ -678,50 +704,52 @@ int main(int argc, char *argv[])
                     TotalWait += currProcess.wait;
                     TotalWTA += WTA;
                     fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
-                    
-                    if(isempty(&finishedQueue) && isempty(&readyQueue) && flag==0){
-                        memoRequests.mtype=1;
-                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT);//deallocate the memory
+
+                    if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)
+                    {
+                        memoRequests.mtype = 1;
+                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
                     }
                 }
 
                 if (!isempty(&readyQueue))
                 {
                     currProcess = dequeue(&readyQueue); //sending signal continue to process
-                    if (currProcess.forked==1)
+                    if (currProcess.forked == 1)
                     {
                         kill(SIGCONT, currProcess.pid);
                     }
 
                     /* To avoid multiple forking for the same process */
-                    if (currProcess.forked !=1)
+                    if (currProcess.forked != 1)
                     {
-                        memoRequests.m.memorySize=currProcess.memsize;
-                        memoRequests.m.proccesID=currProcess.id;
-                        memoRequests.m.start=-1;
-                        memoRequests.mtype=3;
-                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT);//allocate the memory
-                        if(val==-1){
+                        memoRequests.m.memorySize = currProcess.memsize;
+                        memoRequests.m.start = -1;
+                        memoRequests.mtype = 3;
+                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
+                        if (val == -1)
+                        {
                             perror("failed to send request to memo");
                         }
-                        val=msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
-                        if(memoRequests.m.start!=-1){
-                            
+                        val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                        if (memoRequests.m.start != -1)
+                        {
+
                             currProcess.pid = fork();
                             currProcess.forked = 1;
                             currProcess.startTime = Clk;
-                            currProcess.address=memoRequests.m.start;
+                            currProcess.address = memoRequests.m.start;
 
                             /*if this is the child process make it execute the currProcess*/
                             if (currProcess.pid == 0)
                             {
                                 execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
                             }
-                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, memoRequests.m.proccesID, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
                             printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
                         }
                     }
-                    
+
                     printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
                     if (currProcess.remain > 0)
@@ -757,15 +785,15 @@ int main(int argc, char *argv[])
         }
     }
 
-    float CPU_utilization = ((float)usefulTime / (getClk() - 1)) * 100;
-    fprintf(perfFile, " CPU utilization = %.2f\n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
+    float CPU_utilization = ((float)usefulTime / (getClk())) * 100;
+    fprintf(perfFile, " CPU utilization = %.2f %% \n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
     fclose(perfFile);
     fclose(pFile);
     fclose(mFile);
 
-     //TODO: implement the scheduler.
+    //TODO: implement the scheduler.
     //TODO: upon termination release the clock resources.
-//val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);//Deallocate the memory
-//val = msgrcv(msgq_id_MS, &memoMessage, sizeof(memoMessage) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+    //val = msgsnd(msgq_id_SM, &memoMessage, sizeof(memoMessage) - sizeof(long), !IPC_NOWAIT);//Deallocate the memory
+    //val = msgrcv(msgq_id_MS, &memoMessage, sizeof(memoMessage) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
     destroyClk(true);
 }

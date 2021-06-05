@@ -9,6 +9,7 @@ struct process
     int memsize;
     int memoryWait;
     int address;
+    int endAddress;
     int arrival;
     int runtime;
     int priority;

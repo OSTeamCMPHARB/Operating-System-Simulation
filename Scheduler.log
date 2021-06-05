@@ -6,22 +6,24 @@ At	time	9	process	2	blocked		arrived	8	total	4	remain	3	wait	0
 At	time	9	process	3	started		arrived	9	total	1	remain	1	wait	0
 At	time	10	process	3	finished	arrived	9	total	1	remain	0	wait	0	TA	1	WTA	1.00
 At	time	10	process	2	resumed		arrived	8	total	4	remain	3	wait	0
-At	time	13	process	2	finished	arrived	8	total	4	remain	0	wait	0	TA	4	WTA	1.00
-At	time	13	process	5	started		arrived	11	total	3	remain	3	wait	2
-At	time	16	process	5	finished	arrived	11	total	3	remain	0	wait	2	TA	5	WTA	1.67
-At	time	16	process	8	started		arrived	14	total	3	remain	3	wait	2
-At	time	19	process	8	finished	arrived	14	total	3	remain	0	wait	2	TA	5	WTA	1.67
-At	time	19	process	6	started		arrived	12	total	4	remain	4	wait	7
-At	time	23	process	6	finished	arrived	12	total	4	remain	0	wait	7	TA	11	WTA	2.75
-At	time	23	process	9	started		arrived	15	total	4	remain	4	wait	8
-At	time	27	process	9	finished	arrived	15	total	4	remain	0	wait	8	TA	12	WTA	3.00
-At	time	27	process	11	started		arrived	17	total	4	remain	4	wait	10
-At	time	31	process	11	finished	arrived	17	total	4	remain	0	wait	10	TA	14	WTA	3.50
-At	time	31	process	1	resumed		arrived	5	total	8	remain	5	wait	0
-At	time	36	process	1	finished	arrived	5	total	8	remain	0	wait	0	TA	8	WTA	1.00
-At	time	36	process	4	started		arrived	10	total	5	remain	5	wait	26
-At	time	41	process	4	finished	arrived	10	total	5	remain	0	wait	26	TA	31	WTA	6.20
-At	time	41	process	7	started		arrived	13	total	5	remain	5	wait	28
-At	time	46	process	7	finished	arrived	13	total	5	remain	0	wait	28	TA	33	WTA	6.60
-At	time	46	process	10	started		arrived	16	total	5	remain	5	wait	30
-At	time	51	process	10	finished	arrived	16	total	5	remain	0	wait	30	TA	35	WTA	7.00
+At	time	10	process	2	blocked		arrived	8	total	4	remain	3	wait	0
+At	time	10	process	4	started		arrived	10	total	5	remain	5	wait	0
+At	time	15	process	4	finished	arrived	10	total	5	remain	0	wait	0	TA	5	WTA	1.00
+At	time	15	process	8	started		arrived	14	total	3	remain	3	wait	1
+At	time	18	process	8	finished	arrived	14	total	3	remain	0	wait	1	TA	4	WTA	1.33
+At	time	18	process	2	resumed		arrived	8	total	4	remain	3	wait	0
+At	time	21	process	2	finished	arrived	8	total	4	remain	0	wait	0	TA	4	WTA	1.00
+At	time	21	process	5	started		arrived	11	total	3	remain	3	wait	10
+At	time	24	process	5	finished	arrived	11	total	3	remain	0	wait	10	TA	13	WTA	4.33
+At	time	24	process	7	started		arrived	13	total	5	remain	5	wait	11
+At	time	29	process	7	finished	arrived	13	total	5	remain	0	wait	11	TA	16	WTA	3.20
+At	time	29	process	9	started		arrived	15	total	4	remain	4	wait	14
+At	time	33	process	9	finished	arrived	15	total	4	remain	0	wait	14	TA	18	WTA	4.50
+At	time	33	process	11	started		arrived	17	total	4	remain	4	wait	16
+At	time	37	process	11	finished	arrived	17	total	4	remain	0	wait	16	TA	20	WTA	5.00
+At	time	37	process	6	started		arrived	12	total	4	remain	4	wait	25
+At	time	41	process	6	finished	arrived	12	total	4	remain	0	wait	25	TA	29	WTA	7.25
+At	time	41	process	10	started		arrived	16	total	5	remain	5	wait	25
+At	time	46	process	10	finished	arrived	16	total	5	remain	0	wait	25	TA	30	WTA	6.00
+At	time	46	process	1	resumed		arrived	5	total	8	remain	5	wait	0
+At	time	51	process	1	finished	arrived	5	total	8	remain	0	wait	0	TA	8	WTA	1.00

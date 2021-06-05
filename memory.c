@@ -74,6 +74,7 @@ int main(int agrc, char *argv[])
                         printf("finished computing \n");
                         message.mtype = 1; //used as true in case the space is found
                         message.m.start=start;
+                        message.m.end=start+message.m.memorySize-1;
                         //allocate the space found
                         for (int j = start; j < message.m.memorySize + start; j++)
                         {
@@ -148,6 +149,7 @@ int main(int agrc, char *argv[])
                         printf("finished computing \n");
                         message.mtype = 1; //used as true in case the space is found
                         message.m.start = start_memory;
+                        message.m.end=free_space_counter + start_memory;
                         for(int i = start_memory; i <= free_space_counter + start_memory; i++){
                             memory[i] = true;
                             empty_bytes--;
@@ -214,6 +216,7 @@ int main(int agrc, char *argv[])
                         printf("finished computing \n");
                         message.mtype = 1; //used as true in case the space is found
                         message.m.start = start;
+                        message.m.end= message.m.memorySize + start-1;
                         //allocate the space found
                         x++;
                         for (int j = start; j < message.m.memorySize + start; j++)
@@ -232,6 +235,79 @@ int main(int agrc, char *argv[])
     }
     else if (memoAlgorithm == 4)
     {
+        int x=1024;
+        while (true)
+        {
+            val = msgrcv(msgq_id_SM, &message, sizeof(message) - sizeof(long), 0, !IPC_NOWAIT); //recieving the request of memory allocation
+            if (val != 0)
+            {
+                if (message.mtype == 1)
+                {
+                    printf("memo empty size:  %d\n",x);
+                    break;
+                }
+                else if (message.mtype == 2)
+                {
+                   
+
+                    for (int i = message.m.start; i <=message.m.end ; i++)
+                    {
+                        memory[i] = false;
+                        x++;
+                    }
+                }
+                else
+                {
+                    int sizeB = 1024;
+                    int spaceFound = 1;
+                    while (message.m.memorySize <= sizeB)
+                    {
+                        sizeB = sizeB / 2;
+                    }
+                    sizeB = sizeB * 2;
+                    int start = 0;
+                    int end = sizeB - 1;
+
+                    for (int i = start; i <= end; i++)
+                    {
+                        if (memory[i] == true)
+                        {
+                            start = start + sizeB;
+                            i = start;
+                            end = end + sizeB;
+                            if (end > 1023)
+                            {
+                                spaceFound = 0;
+                                break;
+                            }
+                        }
+                    }
+                    if (spaceFound)
+                    {
+                        printf("finished computing \n");
+                        message.mtype = 1; //used as true in case the space is found
+                        message.m.start = start;
+                        message.m.end = end; ///the end index to print it in memory.log
+                        //allocate the space found
+                        for (int j = start; j <= end; j++)
+                        {
+                            memory[j] = true;
+                            x--;
+                        }
+                    }
+                    else
+                    {
+                        message.mtype = 2; //used as true in case the space is not found
+                        message.m.start=-1;
+                    }
+
+                    //if the space needed for memory is available allocate the space to be busy & send acceptance to scheduler
+
+                    printf("sending permission \n");
+                    val = msgsnd(msgq_id_MS, &message, sizeof(message) - sizeof(long), !IPC_NOWAIT);
+                }
+            }
+        }
     }
 
     printf("memory terminated at %d\n", getClk());

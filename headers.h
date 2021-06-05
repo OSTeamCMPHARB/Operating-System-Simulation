@@ -131,7 +131,8 @@ struct memom
 {
     int memorySize;
     int start; // start index
-    int proccesID;
+    int end; // end index;
+ 
 };
 
 struct memoBuff
