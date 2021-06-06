@@ -28,7 +28,7 @@ int main(int agrc, char *argv[])
         while (true)
         {
             val = msgrcv(msgq_id_SM, &message, sizeof(message) - sizeof(long), 0, !IPC_NOWAIT); //recieving the request of memory allocation 3=allocate / 1=terminate / 2=deallocate
-            if (val != 0)
+            if (val != -1)
             {
                 if (message.mtype == 1)
                 {
@@ -49,12 +49,13 @@ int main(int agrc, char *argv[])
                     int i = 0;
                     int spaceFound = 0;
                     int start = 0;
-                    while (counter < message.m.memorySize && i < 1024 && !spaceFound)
+                    while (counter < message.m.memorySize && i < 1024 && spaceFound==0)
                     {
+                        counter = 0;
                         if (!memory[i])
                         {
                             start = i; //indicate the start of empty space
-                            while (i < 1024 && !memory[i] && !spaceFound)
+                            while (i < 1024 && !memory[i] && spaceFound==0)
                             {
                                 counter++;
                                 i++;
@@ -64,14 +65,14 @@ int main(int agrc, char *argv[])
                                     break;
                                 }
                             }
-                            counter = 0;
+                            
                         }
                         i++;
                     }
                     //if the space needed for memory is available allocate the space to be busy & send acceptance to scheduler
                     if (spaceFound)
                     {
-                        printf("finished computing \n");
+                        printf("finished computing & process is accepted \n");
                         message.mtype = 1; //used as true in case the space is found
                         message.m.start=start;
                         message.m.end=start+message.m.memorySize-1;
@@ -83,12 +84,12 @@ int main(int agrc, char *argv[])
                     }
                     else
                     {
+                        printf("finished computing & process is rejected \n");
                         message.m.start=-1;
                     }
                     //printf("sending permission \n");
                     
                     val = msgsnd(msgq_id_MS, &message, sizeof(message) - sizeof(long), !IPC_NOWAIT);
-                    spaceFound=0;
                 }
             }
         }

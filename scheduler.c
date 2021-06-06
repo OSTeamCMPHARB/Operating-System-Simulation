@@ -791,51 +791,63 @@ int main(int argc, char *argv[])
 
                 if (!isempty(&readyQueue))
                 {
-                    currProcess = dequeue(&readyQueue); //sending signal continue to process
-                    if (currProcess.forked == 1)
-                    {
-                        kill(SIGCONT, currProcess.pid);
-                    }
+                    int goToNextLogic=0;
 
-                    /* To avoid multiple forking for the same process */
-                    if (currProcess.forked != 1)
-                    {
-                        memoRequests.m.memorySize = currProcess.memsize;
-                        memoRequests.m.start = -1;
-                        memoRequests.mtype = 3;
-                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
-                        if (val == -1)
+                    while(goToNextLogic==0){
+                        goToNextLogic=0;
+                        currProcess = dequeue(&readyQueue); //sending signal continue to process
+                        if (currProcess.forked == 1)
                         {
-                            perror("failed to send request to memo");
+                            kill(SIGCONT, currProcess.pid);
+                            goToNextLogic=1;
+                            break;//to let it go to nest step which is decremnting the proc time
                         }
-                        val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
-                        if (memoRequests.m.start != -1)
+                        else/* To avoid multiple forking for the same process */
                         {
-
-                            currProcess.pid = fork();
-                            currProcess.forked = 1;
-                            currProcess.startTime = Clk;
-                            currProcess.address = memoRequests.m.start;
-
-                            /*if this is the child process make it execute the currProcess*/
-                            if (currProcess.pid == 0)
+                            memoRequests.m.memorySize = currProcess.memsize;
+                            memoRequests.m.start = -1;
+                            memoRequests.mtype = 3;
+                            val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
+                            if (val == -1)
                             {
-                                execl("/home/bishoy/Desktop/OSproject/OS_Scheduler-main/process.out", "process.out", NULL);
+                                perror("failed to send request to memo");
                             }
-                            fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
-                            printf("running process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                            val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                            if (memoRequests.m.start != -1 && memoRequests.m.start<1024)
+                            {
+
+                                currProcess.pid = fork();
+                                currProcess.forked = 1;
+                                currProcess.startTime = Clk;
+                                currProcess.address = memoRequests.m.start;
+
+                                /*if this is the child process make it execute the currProcess*/
+                                if (currProcess.pid == 0)
+                                {
+                                    execl(path, "process.out", NULL);
+                                }
+                                fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                                printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                break;//to let it go to nest step which is decremnting the proc time
+                            }
+                            else
+                            {
+                                printf("Getting the next Proc ,  Process %i was rejected \n",currProcess.id);
+                                enqueue(&readyQueue,currProcess);
+                            }
                         }
                     }
 
-                    printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
+                    //printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
-                    if (currProcess.remain > 0)
+                    if (currProcess.remain > 0 && currProcess.forked==1)
                     {
                         /*send the remaining time to the process.c to decrement it*/
                         processMessage.mtype = currProcess.pid % 100000;
                         processMessage.remainingTime = currProcess.remain;
                         currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
-                        currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Remaining Time
+                        currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Running Time
+
                         val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
 
                         if (val == -1)
