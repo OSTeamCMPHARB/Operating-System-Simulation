@@ -5,11 +5,30 @@ int msgq_id_SPG;
 int main(int argc, char *argv[])
 {
     signal(SIGINT, clearResources);
+    int schAlgorithm=-1;
+    int memAlgorithm=-1;
+    int freqTime=-1;
+    int txtIndex=-1;
+    for(int i=0;i<8;i++){
+        printf("the curr argv %s \n",argv[i]);
+        if(argv[i][1]=='s'){
+            schAlgorithm=++i;
+            printf("the sch algo is %i \n",schAlgorithm);
+        }else if(argv[i][1]=='q'){
+            freqTime=++i;
+            printf("the time freq is %i \n",freqTime);
+        }else if(argv[i][1]=='m'){
+            memAlgorithm=++i;
+            printf("the memo algo is %i \n",memAlgorithm);
+        }else if(argv[i][strlen(argv[i])-1]=='t'){
+            txtIndex=i;
+        }
+    }
 
     /*Reading of the processes from the file*/
     ///scheduler.o testcase.txt -sch 5 -q 2 -mem 3
     FILE *fp;
-    fp = fopen("processes.txt", "r");
+    fp = fopen(argv[txtIndex], "r");
     queue processesQueue;
     initialize(&processesQueue);
     char buff[255];
@@ -48,14 +67,14 @@ int main(int argc, char *argv[])
     strcat(path, "/memory.out");
     pid[2] = fork();
     if (pid[2] == 0)
-        execl(path, "memory.out", argv[2], NULL);
+        execl(path, "memory.out", argv[memAlgorithm], NULL);
 
     getcwd(path, sizeof(path));
     strcat(path, "/scheduler.out");
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
     if (pid[1] == 0)
-        execl(path, "scheduler.out", argv[1], NULL);
+        execl(path, "scheduler.out", argv[schAlgorithm],argv[freqTime], NULL);
 
     printf("Clock not Initialized \n");
     initClk(); //Initializing the clock at the start of process generation

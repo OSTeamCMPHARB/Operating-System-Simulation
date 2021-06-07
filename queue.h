@@ -21,6 +21,7 @@ struct process
     int startTime;
     int real;
     int isblocked;
+    int remainingTimeFreq;
 };
 
 struct node

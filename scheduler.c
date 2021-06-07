@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
     int val;
     int currTime = getClk();
     int selectAlgo = atoi(argv[1]);
+    int freqTime=atoi(argv[2]);
+    printf("The freq time is %i , The scheduler algo is %i \n",freqTime,selectAlgo);
     //writing output in scheduler.log
     FILE *pFile;
     pFile = fopen("Scheduler.log", "w");
@@ -713,6 +715,7 @@ int main(int argc, char *argv[])
 
         process *processRunning = NULL;
         process currProcess;
+        //int currProcDetector=0;
         int finishTime = 0;
         currTime = -1;
         int printClk = -1;
@@ -756,7 +759,7 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
+            if ((readyQueue.count > 0 || finishedQueue.count > 0 || currProcess.remainingTimeFreq>0) && currTime != Clk)
             { //if it's a new time step run process with the currTurn
                 currTime = Clk;
 
@@ -795,10 +798,13 @@ int main(int argc, char *argv[])
 
                     while(goToNextLogic==0){
                         goToNextLogic=0;
-                        currProcess = dequeue(&readyQueue); //sending signal continue to process
+                        if(currProcess.remainingTimeFreq<=0){//if the freq of the last current proc is over then get the next proc
+                            currProcess = dequeue(&readyQueue); //sending signal continue to process
+                        }
                         if (currProcess.forked == 1)
                         {
                             kill(SIGCONT, currProcess.pid);
+                            currProcess.remainingTimeFreq=freqTime;
                             goToNextLogic=1;
                             break;//to let it go to nest step which is decremnting the proc time
                         }
@@ -820,6 +826,7 @@ int main(int argc, char *argv[])
                                 currProcess.forked = 1;
                                 currProcess.startTime = Clk;
                                 currProcess.address = memoRequests.m.start;
+                                currProcess.remainingTimeFreq=freqTime;
 
                                 /*if this is the child process make it execute the currProcess*/
                                 if (currProcess.pid == 0)
@@ -840,13 +847,14 @@ int main(int argc, char *argv[])
 
                     //printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
-                    if (currProcess.remain > 0 && currProcess.forked==1)
+                    if (currProcess.remainingTimeFreq > 0 && currProcess.remain>0 && currProcess.forked==1)
                     {
                         /*send the remaining time to the process.c to decrement it*/
                         processMessage.mtype = currProcess.pid % 100000;
                         processMessage.remainingTime = currProcess.remain;
                         currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
                         currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Running Time
+                        currProcess.remainingTimeFreq=currProcess.remainingTimeFreq-1;//decrementing the freq time
 
                         val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
 
@@ -857,15 +865,19 @@ int main(int argc, char *argv[])
 
                         /*Details Of Process In That time step*/
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-
-                        kill(SIGSTOP, currProcess.pid); //sending to process to stop
+                        if(currProcess.remainingTimeFreq>0){
+                            kill(SIGSTOP, currProcess.pid); //sending to process to stop
+                        }
+                        
                         /*enqueuing the process again to the queue to take it's turn*/
                         if (currProcess.remain > 0)
                         {
-                            enqueue(&readyQueue, currProcess);
+                            if(currProcess.remainingTimeFreq<=0)//if there is a remaing time freq then keep it in the currProcess
+                                enqueue(&readyQueue, currProcess);
                         }
                         else
                         {
+                            currProcess.remainingTimeFreq=0;
                             enqueue(&finishedQueue, currProcess);
                         }
                     }
