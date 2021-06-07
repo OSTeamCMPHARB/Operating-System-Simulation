@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
     int val;
     int currTime = getClk();
     int selectAlgo = atoi(argv[1]);
-    int freqTime=atoi(argv[2]);
-    printf("The freq time is %i , The scheduler algo is %i \n",freqTime,selectAlgo);
+    int freqTime = atoi(argv[2]);
+    printf("The freq time is %i , The scheduler algo is %i \n", freqTime, selectAlgo);
     //writing output in scheduler.log
     FILE *pFile;
     pFile = fopen("Scheduler.log", "w");
@@ -388,7 +388,7 @@ int main(int argc, char *argv[])
                             {
                                 temp.address = memoRequestRecieve.m.start;
                                 temp.endAddress = memoRequestRecieve.m.end;
-                                printf("memstart=%d memend=%d\n",temp.address,temp.address);
+                                printf("memstart=%d memend=%d\n", temp.address, temp.address);
                                 // processRunning = &currProcess;
                                 changed = true;
                                 break;
@@ -430,7 +430,6 @@ int main(int argc, char *argv[])
                         val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                     }
                 }
-
             }
             if (currTime != getClk()) //freeing
             {
@@ -713,15 +712,18 @@ int main(int argc, char *argv[])
 
         int flag = 1; //inticades that the schedular is not busy
 
+        int flagForFreq = 0;
+        int freqTimeRemain = 0;
+
         process *processRunning = NULL;
         process currProcess;
-        //int currProcDetector=0;
         int finishTime = 0;
         currTime = -1;
         int printClk = -1;
         int TA = 0;
         float WTA = 0;
-        while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue))
+
+        while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue) || flagForFreq)
         {
             int Clk = getClk();
             if (printClk != getClk())
@@ -731,6 +733,7 @@ int main(int argc, char *argv[])
             }
             /*if there is a message from process_generator insert the arrived process in the queue*/
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
+            
             if (val != -1)
             {
                 if (message.allProcessesGenerated == 2)
@@ -759,102 +762,230 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            if ((readyQueue.count > 0 || finishedQueue.count > 0 || currProcess.remainingTimeFreq>0) && currTime != Clk)
-            { //if it's a new time step run process with the currTurn
-                currTime = Clk;
+            if (freqTime == 1)
+            {
+                if ((readyQueue.count > 0 || finishedQueue.count > 0) && currTime != Clk)
+                { //if it's a new time step run process with the currTurn
+                    printf("1");
+                    currTime = Clk;
 
-                if (!isempty(&finishedQueue))
-                { //If process is finished
-                    currProcess = dequeue(&finishedQueue);
-                    memoRequests.m.memorySize = currProcess.memsize;
-                    memoRequests.m.start = currProcess.address;
-                    memoRequests.mtype = 2;
-                    fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                    if (!isempty(&finishedQueue))
+                    { //If process is finished
+                        currProcess = dequeue(&finishedQueue);
+                        memoRequests.m.memorySize = currProcess.memsize;
+                        memoRequests.m.start = currProcess.address;
+                        memoRequests.mtype = 2;
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
 
-                    val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
-                    if (val == -1)
-                    {
-                        perror("error while deallocating request");
-                    }
-                    currProcess.real = 0;
-                    currProcess.finishTime = Clk;
-                    currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
-                    TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
-                    WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
-                    TotalWait += currProcess.wait;
-                    TotalWTA += WTA;
-                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
-
-                    if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)
-                    {
-                        memoRequests.mtype = 1;
                         val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
+                        if (val == -1)
+                        {
+                            perror("error while deallocating request");
+                        }
+                        currProcess.real = 0;
+                        currProcess.finishTime = Clk;
+                        currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
+                        TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
+                        WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
+                        TotalWait += currProcess.wait;
+                        TotalWTA += WTA;
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
+
+                        if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)
+                        {
+                            memoRequests.mtype = 1;
+                            val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
+                        }
                     }
-                }
 
-                if (!isempty(&readyQueue))
-                {
-                    int goToNextLogic=0;
+                    if (!isempty(&readyQueue))
+                    {
+                        int goToNextLogic = 0;
 
-                    while(goToNextLogic==0){
-                        goToNextLogic=0;
-                        if(currProcess.remainingTimeFreq<=0){//if the freq of the last current proc is over then get the next proc
+                        while (goToNextLogic == 0)
+                        {
+                            goToNextLogic = 0;
                             currProcess = dequeue(&readyQueue); //sending signal continue to process
+                            if (currProcess.forked == 1)
+                            {
+                                kill(SIGCONT, currProcess.pid);
+                                goToNextLogic = 1;
+                                break; //to let it go to nest step which is decremnting the proc time
+                            }
+                            else /* To avoid multiple forking for the same process */
+                            {
+                                memoRequests.m.memorySize = currProcess.memsize;
+                                memoRequests.m.start = -1;
+                                memoRequests.mtype = 3;
+                                val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
+                                if (val == -1)
+                                {
+                                    perror("failed to send request to memo");
+                                }
+                                val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                                if (memoRequests.m.start != -1 && memoRequests.m.start < 1024)
+                                {
+
+                                    currProcess.pid = fork();
+                                    currProcess.forked = 1;
+                                    currProcess.startTime = Clk;
+                                    currProcess.address = memoRequests.m.start;
+
+                                    /*if this is the child process make it execute the currProcess*/
+                                    if (currProcess.pid == 0)
+                                    {
+                                        execl(path, "process.out", NULL);
+                                    }
+                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    break; //to let it go to nest step which is decremnting the proc time
+                                }
+                                else
+                                {
+                                    printf("Getting the next Proc ,  Process %i was rejected \n", currProcess.id);
+                                    enqueue(&readyQueue, currProcess);
+                                }
+                            }
                         }
-                        if (currProcess.forked == 1)
+
+                        //printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
+
+                        if (currProcess.remain > 0 && currProcess.forked == 1)
                         {
-                            kill(SIGCONT, currProcess.pid);
-                            currProcess.remainingTimeFreq=freqTime;
-                            goToNextLogic=1;
-                            break;//to let it go to nest step which is decremnting the proc time
-                        }
-                        else/* To avoid multiple forking for the same process */
-                        {
-                            memoRequests.m.memorySize = currProcess.memsize;
-                            memoRequests.m.start = -1;
-                            memoRequests.mtype = 3;
-                            val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
+                            /*send the remaining time to the process.c to decrement it*/
+                            processMessage.mtype = currProcess.pid % 100000;
+                            processMessage.remainingTime = currProcess.remain;
+                            currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
+                            currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Running Time
+
+                            val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
+
                             if (val == -1)
                             {
-                                perror("failed to send request to memo");
+                                perror("Error while schedular send to process");
                             }
-                            val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
-                            if (memoRequests.m.start != -1 && memoRequests.m.start<1024)
+
+                            /*Details Of Process In That time step*/
+                            fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+
+                            kill(SIGSTOP, currProcess.pid); //sending to process to stop
+                            /*enqueuing the process again to the queue to take it's turn*/
+                            if (currProcess.remain > 0)
                             {
-
-                                currProcess.pid = fork();
-                                currProcess.forked = 1;
-                                currProcess.startTime = Clk;
-                                currProcess.address = memoRequests.m.start;
-                                currProcess.remainingTimeFreq=freqTime;
-
-                                /*if this is the child process make it execute the currProcess*/
-                                if (currProcess.pid == 0)
-                                {
-                                    execl(path, "process.out", NULL);
-                                }
-                                fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
-                                printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
-                                break;//to let it go to nest step which is decremnting the proc time
+                                enqueue(&readyQueue, currProcess);
                             }
                             else
                             {
-                                printf("Getting the next Proc ,  Process %i was rejected \n",currProcess.id);
-                                enqueue(&readyQueue,currProcess);
+                                enqueue(&finishedQueue, currProcess);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if ((readyQueue.count > 0 || finishedQueue.count > 0 || flagForFreq) && currTime != Clk)
+                { //if it's a new time step run process with the currTurn
+                    printf("1 \n");
+                    currTime = Clk;
+                    if (!isempty(&finishedQueue))
+                    { //If process is finished
+                        if(currTime==7 || currTime==6){
+                        printf("PROC %i   entered finished",currProcess.id);
+                    }
+                        currProcess = dequeue(&finishedQueue);
+                        memoRequests.m.memorySize = currProcess.memsize;
+                        memoRequests.m.start = currProcess.address;
+                        memoRequests.mtype = 2;
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+
+                        val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
+                        if (val == -1)
+                        {
+                            perror("error while deallocating request");
+                        }
+                        currProcess.real = 0;
+                        currProcess.finishTime = Clk;
+                        currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
+                        TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
+                        WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
+                        TotalWait += currProcess.wait;
+                        TotalWTA += WTA;
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
+
+                        if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)
+                        {
+                            memoRequests.mtype = 1;
+                            val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
+                        }
+                    }
+
+                    if (!isempty(&readyQueue))
+                    {
+                        
+                        int goToNextLogic = 0;
+
+                        while (goToNextLogic == 0 && flagForFreq == 0)
+                        {
+                            goToNextLogic = 0;
+                            currProcess = dequeue(&readyQueue); //sending signal continue to process
+                            if (currProcess.forked == 1)
+                            {
+                                kill(SIGCONT, currProcess.pid);
+                                goToNextLogic = 1;
+                                break; //to let it go to nest step which is decremnting the proc time
+                            }
+                            else /* To avoid multiple forking for the same process */
+                            {
+                                memoRequests.m.memorySize = currProcess.memsize;
+                                memoRequests.m.start = -1;
+                                memoRequests.mtype = 3;
+                                val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), IPC_NOWAIT); //allocate the memory
+                                if (val == -1)
+                                {
+                                    perror("failed to send request to memo");
+                                }
+                                val = msgrcv(msgq_id_MS, &memoRequests, sizeof(memoRequests) - sizeof(long), 0, !IPC_NOWAIT); //recieving the answer from memory 0= NO SPACE    1= SPACE FOUND
+                                if (memoRequests.m.start != -1 && memoRequests.m.start < 1024)
+                                {
+
+                                    currProcess.pid = fork();
+                                    currProcess.forked = 1;
+                                    currProcess.startTime = Clk;
+                                    currProcess.address = memoRequests.m.start;
+
+                                    /*if this is the child process make it execute the currProcess*/
+                                    if (currProcess.pid == 0)
+                                    {
+                                        execl(path, "process.out", NULL);
+                                    }
+                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.start + memoRequests.m.memorySize - 1);
+                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    break; //to let it go to nest step which is decremnting the proc time
+                                }
+                                else
+                                {
+                                    printf("Getting the next Proc ,  Process %i was rejected \n", currProcess.id);
+                                    enqueue(&readyQueue, currProcess);
+                                }
                             }
                         }
                     }
 
-                    //printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
-
-                    if (currProcess.remainingTimeFreq > 0 && currProcess.remain>0 && currProcess.forked==1)
+                    if (currProcess.remain > 0 && currProcess.forked == 1)
                     {
+                        //printf("running \n");
+                        if(flagForFreq==0){
+                            flagForFreq=1;
+                            freqTimeRemain=freqTime-1;//decremting 
+                        }else{
+                            freqTimeRemain=freqTimeRemain-1;
+                        }
                         /*send the remaining time to the process.c to decrement it*/
                         processMessage.mtype = currProcess.pid % 100000;
                         processMessage.remainingTime = currProcess.remain;
                         currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
                         currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Running Time
-                        currProcess.remainingTimeFreq=currProcess.remainingTimeFreq-1;//decrementing the freq time
 
                         val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);
 
@@ -865,19 +996,15 @@ int main(int argc, char *argv[])
 
                         /*Details Of Process In That time step*/
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-                        if(currProcess.remainingTimeFreq>0){
-                            kill(SIGSTOP, currProcess.pid); //sending to process to stop
-                        }
-                        
-                        /*enqueuing the process again to the queue to take it's turn*/
-                        if (currProcess.remain > 0)
-                        {
-                            if(currProcess.remainingTimeFreq<=0)//if there is a remaing time freq then keep it in the currProcess
+                        if(currProcess.remain>0){
+                            if(freqTimeRemain==0){
+                                flagForFreq=0;
+                                kill(SIGSTOP, currProcess.pid); //sending to process to stop
                                 enqueue(&readyQueue, currProcess);
+                            }
                         }
-                        else
-                        {
-                            currProcess.remainingTimeFreq=0;
+                        else{
+                            flagForFreq=0;
                             enqueue(&finishedQueue, currProcess);
                         }
                     }
