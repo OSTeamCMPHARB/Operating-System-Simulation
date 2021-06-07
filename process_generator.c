@@ -9,19 +9,41 @@ int main(int argc, char *argv[])
     int memAlgorithm=-1;
     int freqTime=-1;
     int txtIndex=-1;
-    for(int i=0;i<8;i++){
-        printf("the curr argv %s \n",argv[i]);
-        if(argv[i][1]=='s'){
-            schAlgorithm=++i;
-            printf("the sch algo is %i \n",schAlgorithm);
-        }else if(argv[i][1]=='q'){
-            freqTime=++i;
-            printf("the time freq is %i \n",freqTime);
-        }else if(argv[i][1]=='m'){
-            memAlgorithm=++i;
-            printf("the memo algo is %i \n",memAlgorithm);
-        }else if(argv[i][strlen(argv[i])-1]=='t'){
-            txtIndex=i;
+    if(argv[4][1] == 'q'){
+        for(int i=0;i<8;i++){
+            printf("argc = %d", argc);
+            //./process_generator.out processes.txt -sch 4 -q 2 -mem 2
+            printf("the curr argv %s \n",argv[i]);
+            if(argv[i][1]=='s'){
+                schAlgorithm=++i;
+                printf("the sch algo is %i \n",schAlgorithm);
+            }else if(argv[i][1]=='q'){
+                freqTime=++i;
+                printf("the time freq is %i \n",freqTime);
+            }else if(argv[i][1]=='m'){
+                memAlgorithm=++i;
+                printf("the memo algo is %i \n",memAlgorithm);
+            }else if(argv[i][strlen(argv[i])-1]=='t'){
+                txtIndex=i;
+            }
+        }
+    }
+    else {
+        freqTime = 0;
+        for(int i = 0;i < 6; i++){
+            printf("argc = %d", argc);
+            //./process_generator.out processes.txt -sch 4 -q 2 -mem 2
+            printf("the curr argv %s \n",argv[i]);
+            if(argv[i][1]=='s'){
+                schAlgorithm=++i;
+                printf("the sch algo is %i \n",schAlgorithm);
+            }
+            else if(argv[i][1]=='m'){
+                memAlgorithm=++i;
+                printf("the memo algo is %i \n",memAlgorithm);
+            }else if(argv[i][strlen(argv[i])-1]=='t'){
+                txtIndex=i;
+            }
         }
     }
 
