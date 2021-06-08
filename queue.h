@@ -15,10 +15,8 @@ struct process
     int pid;
     int remain;
     int wait;
-    int forked;
     int finishTime;
     int startTime;
-    int real;
     int isblocked;
     int remainingTimeFreq;
 };

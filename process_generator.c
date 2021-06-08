@@ -69,7 +69,6 @@ int main(int argc, char *argv[])
         fscanf(fp, "%s", buff);
         procObj.memsize = atoi(buff);
         procObj.remain = procObj.runtime;
-        procObj.forked = 0;
         procObj.wait = 0;
         procObj.isblocked = 0;
         enqueue(&processesQueue, procObj);

@@ -211,21 +211,21 @@ int main(int argc, char *argv[])
 
             if (processRunning == NULL && !isemptypriority(&readyQueue))
             {
-                
+
                 currProcess = dequeuepriority(&readyQueue);
                 processRunning = &currProcess;
-                
+
                 memoRequest.m.memorySize = currProcess.memsize;
                 memoRequest.m.start = -1;
                 memoRequest.mtype = 3;
                 val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
                 val = msgrcv(msgq_id_MS, &memoRequest, sizeof(memoRequest) - sizeof(long), 0, !IPC_NOWAIT);
-                if(val == -1)
+                if (val == -1)
                     printf("error while communicating with memory");
                 currProcess.address = memoRequest.m.start;
                 currProcess.endAddress = memoRequest.m.end;
                 fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
-                
+
                 processRunning->pid = fork();
                 if (processRunning->pid == 0)
                 {
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
                 printf("%d\n", currTime);
                 if (processRunning != NULL)
                 {
-                usefulTime++;
+                    usefulTime++;
 
                     // if there is process running decreamt remaing time then send it to this process
                     processRunning->remain--;
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
                         memoRequest.m.end = processRunning->endAddress;
                         memoRequest.mtype = 2;
                         val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
-                        if(val == -1)
+                        if (val == -1)
                             printf("error while communicating with memory");
                         fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
 
@@ -757,7 +757,7 @@ int main(int argc, char *argv[])
             }
             /*if there is a message from process_generator insert the arrived process in the queue*/
             val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, IPC_NOWAIT);
-            
+
             if (val != -1)
             {
                 if (message.allProcessesGenerated == 2)
@@ -766,17 +766,15 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    message.processObj.runtime = 0; //Didn't run before so intialize it to zero
-                    message.processObj.forked = 0;  //Wasn't forked before
-                    message.processObj.real = 1;    //Wasn't forked before
+                    message.processObj.runtime = 0;   //Didn't run before so intialize it to zero
+                    message.processObj.isblocked = 0; //Wasn't forked before
                     enqueue(&readyQueue, message.processObj);
                     NumberOfProcesses++;
                     while (message.moreProcess)
                     {
                         val = msgrcv(msgq_id_SPG, &message, sizeof(message.processObj), 0, !IPC_NOWAIT);
-                        message.processObj.runtime = 0; //Didn't run before so intialize it to zero
-                        message.processObj.forked = 0;  //Wasn't forked before
-                        message.processObj.real = 1;    //Wasn't forked before
+                        message.processObj.runtime = 0;   //Didn't run before so intialize it to zero
+                        message.processObj.isblocked = 0; //Wasn't forked before
                         enqueue(&readyQueue, message.processObj);
                         NumberOfProcesses++;
                     }
@@ -798,16 +796,16 @@ int main(int argc, char *argv[])
                         currProcess = dequeue(&finishedQueue);
                         memoRequests.m.memorySize = currProcess.memsize;
                         memoRequests.m.start = currProcess.address;
+                        memoRequests.m.end = currProcess.endAddress;
 
                         memoRequests.mtype = 2;
-                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, currProcess.endAddress);
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
 
                         val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
                         if (val == -1)
                         {
                             perror("error while deallocating request");
                         }
-                        currProcess.real = 0;
                         currProcess.finishTime = Clk;
                         currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
                         TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
@@ -831,10 +829,9 @@ int main(int argc, char *argv[])
                         {
                             goToNextLogic = 0;
                             currProcess = dequeue(&readyQueue); //sending signal continue to process
-                            if (currProcess.forked == 1)
+                            if (currProcess.isblocked == 1)
                             {
-                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-
+                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
                                 kill(SIGCONT, currProcess.pid);
                                 goToNextLogic = 1;
                                 break; //to let it go to nest step which is decremnting the proc time
@@ -854,18 +851,20 @@ int main(int argc, char *argv[])
                                 {
 
                                     currProcess.pid = fork();
-                                    currProcess.forked = 1;
+                                    currProcess.isblocked = 1;
                                     currProcess.startTime = Clk;
                                     currProcess.address = memoRequests.m.start;
-                                    currProcess.endAddress= memoRequests.m.end;
+                                    currProcess.endAddress = memoRequests.m.end;
 
                                     /*if this is the child process make it execute the currProcess*/
                                     if (currProcess.pid == 0)
                                     {
                                         execl(path, "process.out", NULL);
                                     }
-                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, currProcess.endAddress);
-                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
+                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.isblocked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+
                                     break; //to let it go to nest step which is decremnting the proc time
                                 }
                                 else
@@ -878,7 +877,7 @@ int main(int argc, char *argv[])
 
                         //printf("Will compare getCLk %d with currTIme %d\n", Clk, currTime);
 
-                        if (currProcess.remain > 0 && currProcess.forked == 1)
+                        if (currProcess.remain > 0 && currProcess.isblocked == 1)
                         {
                             usefulTime++;
                             /*send the remaining time to the process.c to decrement it*/
@@ -895,9 +894,10 @@ int main(int argc, char *argv[])
                             }
 
                             /*Details Of Process In That time step*/
-                            fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
 
                             kill(SIGSTOP, currProcess.pid); //sending to process to stop
+                            fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+
                             /*enqueuing the process again to the queue to take it's turn*/
                             if (currProcess.remain > 0)
                             {
@@ -919,21 +919,19 @@ int main(int argc, char *argv[])
                     currTime = Clk;
                     if (!isempty(&finishedQueue))
                     { //If process is finished
-                        if(currTime==7 || currTime==6){
-                        printf("PROC %i   entered finished",currProcess.id);
-                    }
+
                         currProcess = dequeue(&finishedQueue);
                         memoRequests.m.memorySize = currProcess.memsize;
                         memoRequests.m.start = currProcess.address;
+                        memoRequests.m.end = currProcess.endAddress;
                         memoRequests.mtype = 2;
-                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, currProcess.endAddress);
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
 
                         val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
                         if (val == -1)
                         {
                             perror("error while deallocating request");
                         }
-                        currProcess.real = 0;
                         currProcess.finishTime = Clk;
                         currProcess.wait = currProcess.finishTime - currProcess.arrival - currProcess.runtime;
                         TA = currProcess.wait + currProcess.runtime; //total turn around , waiting + running
@@ -951,16 +949,16 @@ int main(int argc, char *argv[])
 
                     if (!isempty(&readyQueue))
                     {
-                        
+
                         int goToNextLogic = 0;
 
                         while (goToNextLogic == 0 && flagForFreq == 0)
                         {
                             goToNextLogic = 0;
                             currProcess = dequeue(&readyQueue); //sending signal continue to process
-                            if (currProcess.forked == 1)
+                            if (currProcess.isblocked == 1)
                             {
-                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
 
                                 kill(SIGCONT, currProcess.pid);
                                 goToNextLogic = 1;
@@ -981,18 +979,20 @@ int main(int argc, char *argv[])
                                 {
 
                                     currProcess.pid = fork();
-                                    currProcess.forked = 1;
+                                    currProcess.isblocked = 1;
                                     currProcess.startTime = Clk;
                                     currProcess.address = memoRequests.m.start;
-                                    currProcess.endAddress=memoRequests.m.end;
+                                    currProcess.endAddress = memoRequests.m.end;
 
                                     /*if this is the child process make it execute the currProcess*/
                                     if (currProcess.pid == 0)
                                     {
                                         execl(path, "process.out", NULL);
                                     }
-                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), memoRequests.m.memorySize, currProcess.id, memoRequests.m.start, memoRequests.m.end);
-                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.forked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
+                                    printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.isblocked, currProcess.arrival, currProcess.remain, currProcess.runtime);
+                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+
                                     break; //to let it go to nest step which is decremnting the proc time
                                 }
                                 else
@@ -1004,14 +1004,17 @@ int main(int argc, char *argv[])
                         }
                     }
 
-                    if (currProcess.remain > 0 && currProcess.forked == 1)
+                    if (currProcess.remain > 0 && currProcess.isblocked == 1)
                     {
                         //printf("running \n");
-                        if(flagForFreq==0){
-                            flagForFreq=1;
-                            freqTimeRemain=freqTime-1;//decremting 
-                        }else{
-                            freqTimeRemain=freqTimeRemain-1;
+                        if (flagForFreq == 0)
+                        {
+                            flagForFreq = 1;
+                            freqTimeRemain = freqTime - 1; //decremting
+                        }
+                        else
+                        {
+                            freqTimeRemain = freqTimeRemain - 1;
                         }
                         /*send the remaining time to the process.c to decrement it*/
                         usefulTime++;
@@ -1028,18 +1031,20 @@ int main(int argc, char *argv[])
                         }
 
                         /*Details Of Process In That time step*/
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-                        if(currProcess.remain>0){
-                            if(freqTimeRemain==0){
-                                flagForFreq=0;
-                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                        if (currProcess.remain > 0)
+                        {
+                            if (freqTimeRemain == 0)
+                            {
+                                flagForFreq = 0;
+                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
 
                                 kill(SIGSTOP, currProcess.pid); //sending to process to stop
                                 enqueue(&readyQueue, currProcess);
                             }
                         }
-                        else{
-                            flagForFreq=0;
+                        else
+                        {
+                            flagForFreq = 0;
                             enqueue(&finishedQueue, currProcess);
                         }
                     }
