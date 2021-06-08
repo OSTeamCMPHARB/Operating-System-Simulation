@@ -12,4 +12,4 @@ clean:
 all: clean build
 
 run: build
-	./process_generator.out processes.txt -sch 3 -mem 2
+	./process_generator.out processes.txt -sch 5 -q 3 -mem 4

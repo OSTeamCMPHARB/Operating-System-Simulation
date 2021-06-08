@@ -7,7 +7,6 @@ struct process
 {
     int id;
     int memsize;
-    int memoryWait;
     int address;
     int endAddress;
     int arrival;
