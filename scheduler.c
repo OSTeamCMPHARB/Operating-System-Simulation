@@ -165,10 +165,11 @@ int main(int argc, char *argv[])
     { //SJF Shortest Job First
         msgbuff message;
         pbuff pmessage;
+        memoBuff memoRequest;
         priorityqueue readyQueue;
         initializepriority(&readyQueue);
-        int flag = 1;
 
+        int flag = 1;
         int TA = 0;
         float WTA = 0;
 
@@ -210,9 +211,21 @@ int main(int argc, char *argv[])
 
             if (processRunning == NULL && !isemptypriority(&readyQueue))
             {
-
+                
                 currProcess = dequeuepriority(&readyQueue);
                 processRunning = &currProcess;
+                
+                memoRequest.m.memorySize = currProcess.memsize;
+                memoRequest.m.start = -1;
+                memoRequest.mtype = 3;
+                val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
+                val = msgrcv(msgq_id_MS, &memoRequest, sizeof(memoRequest) - sizeof(long), 0, !IPC_NOWAIT);
+                if(val == -1)
+                    printf("error while communicating with memory");
+                currProcess.address = memoRequest.m.start;
+                currProcess.endAddress = memoRequest.m.end;
+                fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
+                
                 processRunning->pid = fork();
                 if (processRunning->pid == 0)
                 {
@@ -247,6 +260,16 @@ int main(int argc, char *argv[])
                     if (processRunning->remain == 0)
                     {
                         // if the remaining time =0 set the run pointer to null to take anther process
+
+                        memoRequest.m.memorySize = processRunning->memsize;
+                        memoRequest.m.start = processRunning->address;
+                        memoRequest.m.end = processRunning->endAddress;
+                        memoRequest.mtype = 2;
+                        val = msgsnd(msgq_id_SM, &memoRequest, sizeof(memoRequest) - sizeof(long), !IPC_NOWAIT);
+                        if(val == -1)
+                            printf("error while communicating with memory");
+                        fprintf(mFile, "#At\ttime\t%d\tfreed\t\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
+
                         printf(" run time %d \n", processRunning->remain);
                         TA = processRunning->wait + processRunning->runtime;
                         WTA = (float)TA / processRunning->runtime;
@@ -399,7 +422,7 @@ int main(int argc, char *argv[])
                     if (changed) //change  stop the current and run the highest periorety
                     {
                         kill(processRunning->pid, SIGSTOP); //block the current
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
                         enqueuepriority(&readyQueue, currProcess, processRunning->priority); //change store the current process
                         //currProcess = dequeuepriority(&readyQueue);                          //make the current process the process which has high peririty
@@ -623,7 +646,7 @@ int main(int argc, char *argv[])
                     if (processRunning->remain > beek(&readyQueue)->remain && enterflag) //change
                     {
                         kill(processRunning->pid, SIGSTOP);
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tblocked\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
                         enqueuepriority(&readyQueue, currProcess, processRunning->remain); //change
                         currProcess = dequeuepriority(&readyQueue);
