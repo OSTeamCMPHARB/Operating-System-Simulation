@@ -470,6 +470,7 @@ int main(int argc, char *argv[])
                     val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                     if (processRunning->remain == 0)
                     {
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->runtime;
                         // if the remaining time =0 set the run pointer to null to take anther process and free the memory
                         printf(" run time %d \n", processRunning->remain);
                         TA = processRunning->wait + processRunning->runtime;
@@ -692,6 +693,7 @@ int main(int argc, char *argv[])
                     val = msgsnd(msgq_id_SP, &pmessage, sizeof(pmessage.remainingTime), !IPC_NOWAIT);
                     if (processRunning->remain == 0)
                     {
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->runtime;
                         // if the remaining time =0 set the run pointer to null to take anther process
                         printf(" run time %d \n", processRunning->remain);
                         TA = processRunning->wait + processRunning->runtime;
@@ -738,12 +740,12 @@ int main(int argc, char *argv[])
 
         int flagForFreq = 0;
         int freqTimeRemain = 0;
-        int flagProcessStopped=0;
+        int flagProcessStopped = 0;
 
         process *processRunning = NULL;
         process currProcess;
-        currProcess.id=-1;
-        currProcess.remain=0;
+        currProcess.id = -1;
+        currProcess.remain = 0;
         int finishTime = 0;
         currTime = -1;
         int printClk = -1;
@@ -789,12 +791,12 @@ int main(int argc, char *argv[])
             }
             if (freqTime == 1)
             {
-                
-                if ((readyQueue.count > 0 || finishedQueue.count > 0 || currProcess.remain!=0) && currTime != Clk)
+
+                if ((readyQueue.count > 0 || finishedQueue.count > 0 || currProcess.remain != 0) && currTime != Clk)
                 { //if it's a new time step run process with the currTurn
                     currTime = Clk;
                     //printf("here \n");
-                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq==0)
+                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq == 0)
                     {
                         currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
@@ -906,15 +908,13 @@ int main(int argc, char *argv[])
 
                             /*Details Of Process In That time step*/
 
-                            
-
                             /*enqueuing the process again to the queue to take it's turn*/
                             if (currProcess.remain > 0)
                             {
                                 kill(SIGSTOP, currProcess.pid); //sending to process to stop
-                                flagProcessStopped=1;
+                                flagProcessStopped = 1;
                                 //fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
-                                
+
                                 //enqueue(&readyQueue, currProcess);
                             }
                             else
@@ -931,7 +931,7 @@ int main(int argc, char *argv[])
                 { //if it's a new time step run process with the currTurn
                     //printf("1 \n");
                     currTime = Clk;
-                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq==0)
+                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq == 0)
                     {
                         currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
@@ -961,7 +961,7 @@ int main(int argc, char *argv[])
                         TotalWTA += WTA;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
 
-                        if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)//if the program is over terminate the memo
+                        if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0) //if the program is over terminate the memo
                         {
                             memoRequests.mtype = 1;
                             val = msgsnd(msgq_id_SM, &memoRequests, sizeof(memoRequests) - sizeof(long), !IPC_NOWAIT); //deallocate the memory
@@ -1045,7 +1045,7 @@ int main(int argc, char *argv[])
                         currProcess.remain = (currProcess.remain) - 1;   //Decremting Remaining Time Then will send STOP signal
                         currProcess.runtime = (currProcess.runtime) + 1; //Incrementing Running Time
 
-                        val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT);//sending to process it's remaining time
+                        val = msgsnd(msgq_id_SP, &processMessage, sizeof(processMessage.remainingTime), !IPC_NOWAIT); //sending to process it's remaining time
 
                         if (val == -1)
                         {
@@ -1059,7 +1059,6 @@ int main(int argc, char *argv[])
                             {
                                 flagForFreq = 0;
                                 kill(SIGSTOP, currProcess.pid); //sending to process to stop
-                                
                             }
                         }
                         else
