@@ -750,7 +750,6 @@ int main(int argc, char *argv[])
 
         int flagForFreq = 0;
         int freqTimeRemain = 0;
-        int flagProcessStopped = 0;
 
         process *processRunning = NULL;
         process currProcess;
@@ -761,8 +760,9 @@ int main(int argc, char *argv[])
         int printClk = -1;
         int TA = 0;
         float WTA = 0;
+        int stoppedProc=0;
 
-        while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue) || flagForFreq)
+        while (flag || !isempty(&readyQueue) || !isempty(&finishedQueue) || flagForFreq || stoppedProc)
         {
             int Clk = getClk();
             if (printClk != getClk())
@@ -799,17 +799,18 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            if (freqTime == 1)
+            if (freqTime <= 1)
             {
 
                 if ((readyQueue.count > 0 || finishedQueue.count > 0 || currProcess.remain != 0) && currTime != Clk)
                 { //if it's a new time step run process with the currTurn
+                    stoppedProc=0;
                     currTime = Clk;
                     //printf("here \n");
-                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq == 0)
+                    if (currProcess.id != -1 && isempty(&finishedQueue) && currProcess.remain!=0)
                     {
                         currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait);
                         enqueue(&readyQueue, currProcess);
                     }
 
@@ -834,7 +835,7 @@ int main(int argc, char *argv[])
                         WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                         TotalWait += currProcess.wait;
                         TotalWTA += WTA;
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait, TA, WTA);
 
                         if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0)
                         {
@@ -854,7 +855,7 @@ int main(int argc, char *argv[])
                             if (currProcess.isblocked == 1)
                             {
                                 currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
-                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait);
                                 kill(SIGCONT, currProcess.pid);
                                 goToNextLogic = 1;
                                 break; //to let it go to nest step which is decremnting the proc time
@@ -878,6 +879,7 @@ int main(int argc, char *argv[])
                                     currProcess.startTime = Clk;
                                     currProcess.address = memoRequests.m.start;
                                     currProcess.endAddress = memoRequests.m.end;
+                                    currProcess.wait = currTime - currProcess.arrival;
 
                                     /*if this is the child process make it execute the currProcess*/
                                     if (currProcess.pid == 0)
@@ -886,7 +888,7 @@ int main(int argc, char *argv[])
                                     }
                                     fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
                                     printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.isblocked, currProcess.arrival, currProcess.remain, currProcess.runtime);
-                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait);
 
                                     break; //to let it go to nest step which is decremnting the proc time
                                 }
@@ -921,8 +923,8 @@ int main(int argc, char *argv[])
                             /*enqueuing the process again to the queue to take it's turn*/
                             if (currProcess.remain > 0)
                             {
+                                stoppedProc=1;
                                 kill(SIGSTOP, currProcess.pid); //sending to process to stop
-                                flagProcessStopped = 1;
                                 //fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
 
                                 //enqueue(&readyQueue, currProcess);
@@ -937,14 +939,15 @@ int main(int argc, char *argv[])
             }
             else
             {
-                if ((readyQueue.count > 0 || finishedQueue.count > 0 || flagForFreq) && currTime != Clk)
+                if ((readyQueue.count > 0 || finishedQueue.count > 0 || flagForFreq || stoppedProc) && currTime != Clk)
                 { //if it's a new time step run process with the currTurn
                     //printf("1 \n");
+                    stoppedProc=0;
                     currTime = Clk;
-                    if (currProcess.id != -1 && isempty(&finishedQueue) && flagForFreq == 0)
+                    if (currProcess.id != -1 && currProcess.remain!=0 && isempty(&finishedQueue) && flagForFreq == 0)
                     {
                         currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain,currProcess.remain, currProcess.wait);
                         enqueue(&readyQueue, currProcess);
                     }
 
@@ -969,7 +972,7 @@ int main(int argc, char *argv[])
                         WTA = (float)TA / currProcess.runtime;       //total turn around over runtime
                         TotalWait += currProcess.wait;
                         TotalWTA += WTA;
-                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait, TA, WTA);
+                        fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tfinished\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\tTA\t%d\tWTA\t%.2f\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait, TA, WTA);
 
                         if (isempty(&finishedQueue) && isempty(&readyQueue) && flag == 0) //if the program is over terminate the memo
                         {
@@ -990,7 +993,7 @@ int main(int argc, char *argv[])
                             if (currProcess.isblocked == 1)
                             {
                                 currProcess.wait = currTime - currProcess.arrival - currProcess.runtime;
-                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                                fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", currTime, currProcess.id, currProcess.arrival, currProcess.runtime+currProcess.remain, currProcess.remain, currProcess.wait);
 
                                 kill(SIGCONT, currProcess.pid);
                                 goToNextLogic = 1;
@@ -1015,6 +1018,7 @@ int main(int argc, char *argv[])
                                     currProcess.startTime = Clk;
                                     currProcess.address = memoRequests.m.start;
                                     currProcess.endAddress = memoRequests.m.end;
+                                    currProcess.wait = currTime - currProcess.arrival;
 
                                     /*if this is the child process make it execute the currProcess*/
                                     if (currProcess.pid == 0)
@@ -1023,7 +1027,7 @@ int main(int argc, char *argv[])
                                     }
                                     fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), currProcess.memsize, currProcess.id, currProcess.address, currProcess.endAddress);
                                     printf("just forked process details : pid=%d  forked=%d  arrival= %d     remain=%d      runtime=%d\n", currProcess.id, currProcess.isblocked, currProcess.arrival, currProcess.remain, currProcess.runtime);
-                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime, currProcess.remain, currProcess.wait);
+                                    fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarr\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), currProcess.id, currProcess.arrival, currProcess.runtime +currProcess.remain, currProcess.remain, currProcess.wait);
 
                                     break; //to let it go to nest step which is decremnting the proc time
                                 }
@@ -1068,6 +1072,7 @@ int main(int argc, char *argv[])
                             if (freqTimeRemain == 0)
                             {
                                 flagForFreq = 0;
+                                stoppedProc=1;
                                 kill(SIGSTOP, currProcess.pid); //sending to process to stop
                             }
                         }
@@ -1081,8 +1086,8 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    float CPU_utilization = ((float)usefulTime / (getClk())) * 100;
+    usefulTime++;
+    float CPU_utilization = ((float)usefulTime/ (getClk())) * 100;
     fprintf(perfFile, " CPU utilization = %.2f %% \n Avg WTA = %.2f\n Avg Waiting = %.2f", CPU_utilization, TotalWTA / NumberOfProcesses, TotalWait / NumberOfProcesses);
     fclose(perfFile);
     fclose(pFile);

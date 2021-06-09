@@ -23,13 +23,13 @@ int main(int argc, char *argv[])
             }else if(argv[i][1]=='m'){
                 memAlgorithm=++i;
                 printf("the memo algo is %i \n",memAlgorithm);
-            }else if(argv[i][strlen(argv[i])-1]=='t'){
+            }else if(i!=0 && argv[i][strlen(argv[i])-1]=='t'){
                 txtIndex=i;
             }
         }
     }
     else {
-        freqTime = 0;
+        freqTime = 1;
         for(int i = 0;i < 6; i++){
             printf("argc = %d", argc);
             //./process_generator.out processes.txt -sch 4 -q 2 -mem 2
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
             else if(argv[i][1]=='m'){
                 memAlgorithm=++i;
                 printf("the memo algo is %i \n",memAlgorithm);
-            }else if(argv[i][strlen(argv[i])-1]=='t'){
+            }else if(i!=0 && argv[i][strlen(argv[i])-1]=='t'){
                 txtIndex=i;
             }
         }
@@ -95,8 +95,15 @@ int main(int argc, char *argv[])
     strcat(path, "/scheduler.out");
     pid[1] = fork();
     // pass argv[1] to scheduler (the chosen scheduler algo)
-    if (pid[1] == 0)
-        execl(path, "scheduler.out", argv[schAlgorithm],argv[freqTime], NULL);
+    if (pid[1] == 0){
+        if(freqTime==1){
+            execl(path, "scheduler.out", argv[schAlgorithm],"1", NULL);
+        }else{
+            execl(path, "scheduler.out", argv[schAlgorithm],argv[freqTime], NULL);
+        }
+    }
+
+        
 
     printf("Clock not Initialized \n");
     initClk(); //Initializing the clock at the start of process generation
