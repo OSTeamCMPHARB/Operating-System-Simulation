@@ -19,6 +19,7 @@ struct process
     int startTime;
     int isblocked;
     int remainingTimeFreq;
+      int effectinetime;//the time that the process has spent in the cpu until a spacific moment 
 };
 
 struct node

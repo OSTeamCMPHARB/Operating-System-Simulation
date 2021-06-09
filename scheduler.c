@@ -338,6 +338,7 @@ int main(int argc, char *argv[])
                         kill(processRunning->pid, SIGCONT);
                         finishTime = getClk() + processRunning->remain;
                         printf("process with PID = %d resumed at time step = %d  the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                     }
                     else
@@ -368,6 +369,7 @@ int main(int argc, char *argv[])
                             currProcess.endAddress = memoRequestRecieve.m.end;
                             // processRunning = &currProcess;
                         }
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstarted\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), processRunning->memsize, processRunning->id, processRunning->address, processRunning->endAddress);
                     }
@@ -423,6 +425,7 @@ int main(int argc, char *argv[])
                     if (changed) //change  stop the current and run the highest periorety
                     {
                         kill(processRunning->pid, SIGSTOP); //block the current
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
                         enqueuepriority(&readyQueue, currProcess, processRunning->priority); //change store the current process
@@ -433,6 +436,7 @@ int main(int argc, char *argv[])
                         {
                             kill(processRunning->pid, SIGCONT);
                             finishTime = currTime + processRunning->remain;
+                            processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                             printf("process with PID = %d continue at time step = %d the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         }
@@ -464,6 +468,7 @@ int main(int argc, char *argv[])
                 {
                     usefulTime++;
                     // if there is process running decreamt remaing time then send it to this process
+                    processRunning->effectinetime++;
                     processRunning->remain--;
                     pmessage.mtype = processRunning->pid % 100000;
                     pmessage.remainingTime = processRunning->remain;
@@ -594,6 +599,7 @@ int main(int argc, char *argv[])
                     {
                         kill(processRunning->pid, SIGCONT);
                         finishTime = getClk() + processRunning->remain;
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                         printf("process with PID = %d resumed at time step = %d  the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                     }
@@ -642,12 +648,14 @@ int main(int argc, char *argv[])
                         {
                             tempPtr->address = memoRequestRecieve.m.start;
                             tempPtr->endAddress = memoRequestRecieve.m.end;
+                            
                             fprintf(mFile, "#At\ttime\t%d\tallocated\t%d\tbytes\tfor process\t%d\tfrom\t%d\tto\t%d \n", getClk(), tempPtr->memsize, tempPtr->id, tempPtr->address, tempPtr->endAddress);
                         }
                     }
                     if (processRunning->remain > beek(&readyQueue)->remain && enterflag) //change
                     {
                         kill(processRunning->pid, SIGSTOP);
+                        processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                         fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tstopped\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         processRunning->isblocked = 1;
                         enqueuepriority(&readyQueue, currProcess, processRunning->remain); //change
@@ -657,6 +665,7 @@ int main(int argc, char *argv[])
                         {
                             kill(processRunning->pid, SIGCONT);
                             finishTime = currTime + processRunning->remain;
+                            processRunning->wait = currTime - processRunning->arrival - processRunning->effectinetime;
                             printf("process with PID = %d continue at time step = %d the remaining time = %d the finish time = %d \n", processRunning->id, getClk(), processRunning->remain, finishTime);
                             fprintf(pFile, "At\ttime\t%d\tprocess\t%d\tresumed\t\tarrived\t%d\ttotal\t%d\tremain\t%d\twait\t%d\n", getClk(), processRunning->id, processRunning->arrival, processRunning->runtime, processRunning->remain, processRunning->wait);
                         }
@@ -687,6 +696,7 @@ int main(int argc, char *argv[])
                     usefulTime++;
 
                     // if there is process running decreamt remaing time then send it to this process
+                    processRunning->effectinetime++;
                     processRunning->remain--;
                     pmessage.mtype = processRunning->pid % 100000;
                     pmessage.remainingTime = processRunning->remain;

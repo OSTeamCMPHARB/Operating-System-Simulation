@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
         procObj.remain = procObj.runtime;
         procObj.wait = 0;
         procObj.isblocked = 0;
+        procObj.effectinetime=0;
         enqueue(&processesQueue, procObj);
     }
 
